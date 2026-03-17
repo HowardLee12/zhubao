@@ -119,32 +119,34 @@ export default function QuoteDetailPage() {
           onClick={async () => {
             if (!quote) return;
             setSharing(true);
-            const clientTotal = quote.sections.reduce(
-              (sum, section) => sum + calculateSectionTotal(section.items, "client"),
-              0
-            );
-            const quoteUrl = `${globalThis.location.origin}/quotes/${quote.id}/share`;
-            const projectName = `${quote.customerName} ${quote.address}`;
-            const totalText = formatCurrency(clientTotal);
+            try {
+              const clientTotal = quote.sections.reduce(
+                (sum, section) => sum + calculateSectionTotal(section.items, "client"),
+                0
+              );
+              const quoteUrl = `${globalThis.location.origin}/quotes/${quote.id}/share`;
+              const projectName = `${quote.customerName} ${quote.address}`;
+              const totalText = formatCurrency(clientTotal);
 
-            // Try native share (iPhone share sheet) first
-            if (typeof navigator !== "undefined" && navigator.share) {
-              try {
-                await navigator.share({
-                  title: `${projectName} 報價單`,
-                  text: `${projectName} 報價單\n工程總價：${totalText}`,
-                  url: quoteUrl,
-                });
-                setSharing(false);
-                return;
-              } catch {
-                // User cancelled or share failed — try LINE fallback
+              // Try native share (iPhone share sheet) first
+              if (navigator.share) {
+                try {
+                  await navigator.share({
+                    title: `${projectName} 報價單`,
+                    text: `${projectName} 報價單\n工程總價：${totalText}`,
+                    url: quoteUrl,
+                  });
+                  return;
+                } catch {
+                  // User cancelled or share failed — try LINE fallback
+                }
               }
-            }
 
-            // Fallback: LINE share via LIFF
-            await shareQuoteToLine(quoteUrl, projectName, totalText);
-            setSharing(false);
+              // Fallback: LINE share via LIFF
+              await shareQuoteToLine(quoteUrl, projectName, totalText);
+            } finally {
+              setSharing(false);
+            }
           }}
           disabled={sharing}
           className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"

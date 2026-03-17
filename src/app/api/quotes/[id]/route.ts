@@ -1,33 +1,47 @@
 import { NextResponse } from "next/server";
 import { getQuote } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
-import { ProjectRow } from "@/lib/database.types";
+import { getUserId } from "@/lib/auth";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const quote = await getQuote(id);
+  const userId = await getUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  const { id } = await params;
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const quote = await getQuote(id);
   if (!quote) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { data } = await supabase
+  // Verify quote belongs to this user's project
+  const { data: project } = await supabase
     .from("projects")
-    .select("*")
+    .select("customer_name, address")
     .eq("id", quote.project_id)
+    .eq("user_id", userId)
     .single();
 
-  const project = data;
+  if (!project) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   return NextResponse.json({
     id: quote.id,
     projectId: quote.project_id,
     version: quote.version,
-    customerName: project?.customer_name ?? "",
-    address: project?.address ?? "",
+    customerName: project.customer_name ?? "",
+    address: project.address ?? "",
     sections: quote.sections.map((section) => ({
       id: section.id,
       name: section.name,

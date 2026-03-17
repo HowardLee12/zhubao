@@ -3,12 +3,12 @@ import { getUserId } from "./auth";
 import {
   ProjectRow, TradeRow, PaymentRow,
   QuoteRow, QuoteSectionRow, QuoteItemRow,
-  UserRow,
+  UserRow, PhotoRow,
 } from "./database.types";
 
 export const PLAN_LIMITS = {
-  free: { quotes: 1, projects: 1 },
-  pro: { quotes: Infinity, projects: Infinity },
+  free: { quotes: 1, projects: 1, photosPerProject: 10 },
+  pro: { quotes: Infinity, projects: Infinity, photosPerProject: Infinity },
 } as const;
 
 export interface ProjectWithRelations extends ProjectRow {
@@ -240,4 +240,47 @@ export async function canCreateProject(): Promise<boolean> {
 
   const limit = PLAN_LIMITS[profile.plan]?.projects ?? PLAN_LIMITS.free.projects;
   return usage.projectCount < limit;
+}
+
+// ===== Photos =====
+
+export async function getPhotosByProject(projectId: string): Promise<PhotoRow[]> {
+  const { data, error } = await supabase
+    .from("photos")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false });
+
+  if (error) return [];
+  return (data ?? []) as PhotoRow[];
+}
+
+export async function getPhotoCount(projectId: string): Promise<number> {
+  const { count } = await supabase
+    .from("photos")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", projectId);
+
+  return count ?? 0;
+}
+
+export async function canUploadPhoto(projectId: string): Promise<{ allowed: boolean; remaining: number }> {
+  const [profile, count] = await Promise.all([
+    getUserProfile(),
+    getPhotoCount(projectId),
+  ]);
+
+  const plan = profile?.plan ?? "free";
+  const limit = PLAN_LIMITS[plan]?.photosPerProject ?? PLAN_LIMITS.free.photosPerProject;
+
+  if (limit === Infinity) return { allowed: true, remaining: Infinity };
+
+  return {
+    allowed: count < limit,
+    remaining: Math.max(0, limit - count),
+  };
+}
+
+export function getPhotoPublicUrl(path: string): string {
+  return supabase.storage.from("photos").getPublicUrl(path).data.publicUrl;
 }

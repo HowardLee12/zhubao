@@ -77,6 +77,14 @@ export async function deleteProject(id: string) {
   const userId = await getUserId();
   if (!userId) throw new Error("請先登入");
 
+  // Clean up photos from storage before cascading delete
+  const storagePath = `${userId}/${id}`;
+  const { data: files } = await supabase.storage.from("photos").list(storagePath);
+  if (files && files.length > 0) {
+    const paths = files.map((f) => `${storagePath}/${f.name}`);
+    await supabase.storage.from("photos").remove(paths);
+  }
+
   const { error } = await supabase
     .from("projects")
     .delete()
@@ -394,6 +402,38 @@ export async function addTrade(data: {
   if (error) throw new Error(`Failed to add trade: ${error.message}`);
   revalidatePath(`/projects/${data.projectId}`);
   revalidatePath("/schedule");
+}
+
+// ===== Photos =====
+
+export async function deletePhoto(photoId: string, projectId: string) {
+  const userId = await getUserId();
+  if (!userId) throw new Error("請先登入");
+
+  // Fetch photo to get storage paths
+  const { data: photo, error: fetchError } = await supabase
+    .from("photos")
+    .select("file_path, thumbnail_path, user_id")
+    .eq("id", photoId)
+    .single();
+
+  if (fetchError || !photo) throw new Error("找不到照片");
+  if (photo.user_id !== userId) throw new Error("無權限刪除此照片");
+
+  // Delete from storage
+  const paths = [photo.file_path, photo.thumbnail_path].filter(Boolean);
+  if (paths.length > 0) {
+    await supabase.storage.from("photos").remove(paths);
+  }
+
+  // Delete DB row
+  const { error } = await supabase
+    .from("photos")
+    .delete()
+    .eq("id", photoId);
+
+  if (error) throw new Error(`刪除照片失敗: ${error.message}`);
+  revalidatePath(`/projects/${projectId}`);
 }
 
 // ===== Helpers =====

@@ -77,6 +77,18 @@ export type QuoteItemRow = {
   sort_order: number;
 };
 
+export type PhotoRow = {
+  id: string;
+  project_id: string;
+  trade_id: string | null;
+  user_id: string;
+  file_path: string;
+  thumbnail_path: string;
+  caption: string;
+  file_size: number;
+  created_at: string;
+};
+
 export interface Database {
   public: {
     Tables: {

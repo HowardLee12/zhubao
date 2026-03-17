@@ -45,7 +45,9 @@ src/
 │   ├── (public)/             # Route group — no auth required
 │   │   ├── layout.tsx        # Passthrough layout
 │   │   └── quotes/[id]/share/page.tsx  # Public quote share page for homeowners
-│   └── api/quotes/[id]/      # Quote data API route (auth + ownership check)
+│   └── api/
+│       ├── quotes/[id]/      # Quote data API route (auth + ownership check)
+│       └── photos/upload/    # Photo upload API (compress → storage → DB)
 ├── components/
 │   ├── bottom-nav.tsx        # Bottom tab navigation (with prefetch)
 │   ├── liff-provider.tsx     # LINE LIFF SDK init + login trigger
@@ -63,7 +65,10 @@ src/
 │   ├── schedule-trade-card.tsx # Schedule page trade card (status toggle + project link)
 │   ├── quote-section-card.tsx # Quote section display
 │   ├── quote-version-toggle.tsx # Cost/client version switch
-│   └── logout-button.tsx     # Logout button (clears cookies + LIFF logout)
+│   ├── logout-button.tsx     # Logout button (clears cookies + LIFF logout)
+│   ├── photo-grid.tsx        # Photo thumbnail grid with trade filter tabs
+│   ├── photo-lightbox.tsx    # Full-size photo viewer overlay with delete
+│   └── photo-upload.tsx      # Photo upload with compression + progress
 ├── lib/
 │   ├── supabase.ts           # Supabase client (untyped, anon key)
 │   ├── liff.ts               # LINE LIFF SDK wrapper (init, login, share, isInitialized)
@@ -71,9 +76,10 @@ src/
 │   ├── queries.ts            # Data access layer (getProjects, getQuote, etc.)
 │   ├── actions.ts            # Server actions (CRUD operations)
 │   ├── format.ts             # Currency, date, price calculation utils
+│   ├── image-compress.ts     # Client-side WebP/JPEG compression (photo + thumbnail)
 │   └── types.ts              # Frontend-facing types
 └── supabase/
-    └── schema.sql            # 6 tables with RLS (open policies for now)
+    └── schema.sql            # 7 tables with RLS (open policies for now)
 ```
 
 ## Database Tables
@@ -85,6 +91,7 @@ src/
 5. **quotes** — versioned quotes per project
 6. **quote_sections** — categorized sections (拆除, 水電, 泥作, etc.)
 7. **quote_items** — line items with unit cost + markup %
+8. **photos** — construction photos (project_id, trade_id nullable, file_path, thumbnail_path, file_size)
 
 ## Key Features (Implemented)
 
@@ -123,13 +130,17 @@ src/
 - [x] **Account page** — profile display, plan info, usage stats, logout
 - [x] **Free plan quota** — free users limited to 1 quote, enforced in server action + UI
 - [x] **Bottom nav restructured** — 案件, 排程, 收款, 帳號 (removed 報價單 tab)
+- [x] **施工照片管理** — upload, compress (WebP/JPEG), tag to trade, thumbnail grid, lightbox viewer, delete
+- [x] **Photo compression** — client-side canvas resize: main ~300KB (1200px), thumbnail ~30KB (300px)
+- [x] **Photo storage** — Supabase Storage bucket `photos`, path: `{userId}/{projectId}/{uuid}.ext`
+- [x] **Photo quota** — free: 10/project, pro: unlimited
 
 ## Pending Work
 - [ ] **Supabase RLS tightening** — currently open policies (`USING (true)`), need user-scoped RLS
 - [ ] **Child resource ownership checks** — trades, payments, quote items mutations need ownership verification via parent project
 - [ ] **Input validation** — zod schemas for server actions
 - [ ] **Transactional writes** — atomic quote creation via Postgres function
-- [ ] **施工照片管理** — construction photo management (top feature gap from user survey)
+- [ ] **Photo sharing** — include photos in public share page for homeowners
 
 ## Known Technical Decisions
 

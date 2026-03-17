@@ -1,22 +1,24 @@
 "use client";
 
 import { useEffect, createContext, useContext, useState, useCallback } from "react";
-import { initLiff, isLoggedIn, getProfile } from "@/lib/liff";
+import { initLiff, isLoggedIn, getProfile, isInLiff, login } from "@/lib/liff";
+
+interface UserInfo {
+  id: string;
+  displayName: string;
+  pictureUrl?: string;
+}
 
 interface LiffContextValue {
   ready: boolean;
-  loggedIn: boolean;
-  profile: {
-    displayName: string;
-    pictureUrl?: string;
-    userId: string;
-  } | null;
+  user: UserInfo | null;
+  loading: boolean;
 }
 
 const LiffContext = createContext<LiffContextValue>({
   ready: false,
-  loggedIn: false,
-  profile: null,
+  user: null,
+  loading: true,
 });
 
 export function useLiff() {
@@ -26,15 +28,54 @@ export function useLiff() {
 export function LiffProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<LiffContextValue>({
     ready: false,
-    loggedIn: false,
-    profile: null,
+    user: null,
+    loading: true,
   });
 
   const initialize = useCallback(async () => {
     await initLiff();
-    const loggedIn = isLoggedIn();
-    const profile = loggedIn ? await getProfile() : null;
-    setState({ ready: true, loggedIn, profile });
+
+    // If in LIFF but not logged in, trigger login
+    if (isInLiff() && !isLoggedIn()) {
+      login();
+      return;
+    }
+
+    // If logged in, get profile and register/login with our backend
+    if (isLoggedIn()) {
+      const profile = await getProfile();
+      if (profile) {
+        try {
+          const res = await fetch("/api/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lineUserId: profile.userId,
+              displayName: profile.displayName,
+              pictureUrl: profile.pictureUrl ?? "",
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setState({
+              ready: true,
+              user: {
+                id: data.id,
+                displayName: data.displayName,
+                pictureUrl: data.pictureUrl,
+              },
+              loading: false,
+            });
+            return;
+          }
+        } catch {
+          // Fall through to non-auth state
+        }
+      }
+    }
+
+    // Not in LIFF or not logged in — still allow access (browser mode)
+    setState({ ready: true, user: null, loading: false });
   }, []);
 
   useEffect(() => {

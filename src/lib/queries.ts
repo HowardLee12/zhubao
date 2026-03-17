@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { getUserId } from "./auth";
 import {
   ProjectRow, TradeRow, PaymentRow,
   QuoteRow, QuoteSectionRow, QuoteItemRow,
@@ -18,10 +19,18 @@ export interface QuoteWithProject extends QuoteRow {
 }
 
 export async function getProjects(): Promise<ProjectWithRelations[]> {
-  const { data: projects, error } = await supabase
+  const userId = await getUserId();
+
+  let query = supabase
     .from("projects")
     .select("*")
     .order("created_at", { ascending: false });
+
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+
+  const { data: projects, error } = await query;
 
   if (error) throw new Error(`Failed to fetch projects: ${error.message}`);
 
@@ -46,11 +55,18 @@ export async function getProjects(): Promise<ProjectWithRelations[]> {
 }
 
 export async function getProject(id: string): Promise<ProjectWithRelations | null> {
-  const { data, error } = await supabase
+  const userId = await getUserId();
+
+  let query = supabase
     .from("projects")
     .select("*")
-    .eq("id", id)
-    .single();
+    .eq("id", id);
+
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+
+  const { data, error } = await query.single();
 
   if (error) return null;
   const project = data as ProjectRow;
@@ -119,9 +135,22 @@ export async function getQuotesByProject(projectId: string): Promise<QuoteRow[]>
 }
 
 export async function getAllQuotesWithProjects(): Promise<QuoteWithProject[]> {
+  const userId = await getUserId();
+
+  // First get user's projects, then their quotes
+  let projectQuery = supabase.from("projects").select("id");
+  if (userId) {
+    projectQuery = projectQuery.eq("user_id", userId);
+  }
+  const { data: userProjects } = await projectQuery;
+  const userProjectIds = ((userProjects ?? []) as { id: string }[]).map((p) => p.id);
+
+  if (userProjectIds.length === 0) return [];
+
   const { data, error } = await supabase
     .from("quotes")
     .select("*")
+    .in("project_id", userProjectIds)
     .order("updated_at", { ascending: false });
 
   if (error) throw new Error(`Failed to fetch quotes: ${error.message}`);

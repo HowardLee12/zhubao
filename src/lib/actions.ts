@@ -3,6 +3,7 @@
 import { supabase } from "./supabase";
 import { revalidatePath } from "next/cache";
 import { ProjectRow, QuoteRow } from "./database.types";
+import { getUserId } from "./auth";
 
 // ===== Projects =====
 
@@ -11,6 +12,8 @@ export async function createProject(data: {
   address: string;
   description: string;
 }): Promise<ProjectRow> {
+  const userId = await getUserId();
+
   const { data: project, error } = await supabase
     .from("projects")
     .insert({
@@ -20,6 +23,7 @@ export async function createProject(data: {
       total_amount: 0,
       status: "planning" as const,
       progress: 0,
+      user_id: userId,
     })
     .select()
     .single();

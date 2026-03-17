@@ -1,7 +1,17 @@
+export type UserRow = {
+  id: string;
+  line_user_id: string;
+  display_name: string;
+  picture_url: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ProjectRow = {
   id: string;
   customer_name: string;
   address: string;
+  user_id: string | null;
   description: string;
   total_amount: number;
   status: "planning" | "in_progress" | "completed";

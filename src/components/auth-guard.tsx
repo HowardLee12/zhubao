@@ -2,27 +2,14 @@
 
 import { useLiff } from "./liff-provider";
 
-function DebugPanel({ log }: { log: string[] }) {
-  if (log.length === 0) return null;
-  return (
-    <div className="mt-4 w-full max-w-sm bg-gray-900 text-green-400 text-[10px] font-mono p-3 rounded-lg max-h-60 overflow-y-auto">
-      <div className="text-yellow-400 mb-1 font-bold">DEBUG LOG</div>
-      {log.map((line, i) => (
-        <div key={i}>{line}</div>
-      ))}
-    </div>
-  );
-}
-
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { loading, user, debugLog } = useLiff();
+  const { loading, user } = useLiff();
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background">
         <div className="text-2xl font-bold text-primary mb-2">築報</div>
         <div className="text-sm text-muted-foreground">載入中...</div>
-        <DebugPanel log={debugLog} />
       </div>
     );
   }
@@ -48,7 +35,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             首次使用會自動建立帳號
           </div>
         </div>
-        <DebugPanel log={debugLog} />
       </div>
     );
   }

@@ -29,9 +29,13 @@ const dotStyle: Record<TradeStatus, string> = {
 export function TradeList({
   trades,
   projectId,
+  projectName,
+  projectAddress,
 }: {
   trades: TradeRow[];
   projectId: string;
+  projectName: string;
+  projectAddress: string;
 }) {
   const router = useRouter();
   const [optimisticStatuses, setOptimisticStatuses] = useState<Record<string, TradeStatus>>({});
@@ -73,6 +77,35 @@ export function TradeList({
     }
   };
 
+  const handleShare = async (trade: TradeRow) => {
+    const dateRange = trade.start_date && trade.end_date
+      ? `${formatDate(trade.start_date)}~${formatDate(trade.end_date)}`
+      : trade.start_date
+        ? formatDate(trade.start_date)
+        : "待定";
+
+    const lines = [
+      `${trade.name}工程通知`,
+      "",
+      `案件：${projectName}`,
+      `地點：${projectAddress}`,
+      `日期：${dateRange}`,
+      trade.crew ? `工班：${trade.crew}` : "",
+      "",
+      "— 築報",
+    ].filter(Boolean);
+
+    const text = lines.join("\n");
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `${trade.name}工程通知`, text });
+      } catch {
+        // User cancelled
+      }
+    }
+  };
+
   if (trades.length === 0) return null;
 
   return (
@@ -87,12 +120,21 @@ export function TradeList({
 
         return (
           <div key={trade.id} className="relative overflow-hidden">
-            {/* Delete button (revealed on swipe) */}
+            {/* Action buttons (revealed on swipe) */}
             <div className="absolute right-0 top-0 bottom-0 flex items-center">
+              <button
+                onClick={() => {
+                  handleShare(trade);
+                  setSwipedId(null);
+                }}
+                className="h-full px-3 bg-primary text-white text-xs font-medium"
+              >
+                通知
+              </button>
               <button
                 onClick={() => handleDelete(trade)}
                 disabled={isDeleting}
-                className="h-full px-4 bg-destructive text-white text-xs font-medium"
+                className="h-full px-3 bg-destructive text-white text-xs font-medium"
               >
                 {isDeleting ? "..." : "刪除"}
               </button>
@@ -101,7 +143,7 @@ export function TradeList({
             {/* Main content */}
             <div
               className={`relative bg-card flex items-center gap-3 px-4 py-2.5 transition-transform ${
-                isSwiped ? "-translate-x-16" : "translate-x-0"
+                isSwiped ? "-translate-x-[7.5rem]" : "translate-x-0"
               }`}
               onClick={() => setSwipedId(isSwiped ? null : trade.id)}
             >

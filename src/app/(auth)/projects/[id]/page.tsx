@@ -41,7 +41,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         <div className="text-sm font-semibold text-sage-800 mb-3">工種進度</div>
         {project.trades.length > 0 && (
           <div className="mb-3">
-            <TradeList trades={project.trades} projectId={project.id} />
+            <TradeList trades={project.trades} projectId={project.id} projectName={project.customer_name} projectAddress={project.address} />
           </div>
         )}
         <AddTradeForm projectId={project.id} />

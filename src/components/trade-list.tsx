@@ -34,23 +34,26 @@ export function TradeList({
   projectId: string;
 }) {
   const router = useRouter();
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [optimisticStatuses, setOptimisticStatuses] = useState<Record<string, TradeStatus>>({});
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [swipedId, setSwipedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleStatusChange = async (trade: TradeRow, newStatus: TradeStatus) => {
-    if (newStatus === trade.status) return;
+  const getStatus = (trade: TradeRow): TradeStatus =>
+    optimisticStatuses[trade.id] ?? trade.status;
 
-    setUpdatingId(trade.id);
+  const handleStatusChange = async (trade: TradeRow, newStatus: TradeStatus) => {
+    if (newStatus === getStatus(trade)) return;
+
+    const prevStatus = getStatus(trade);
+    setOptimisticStatuses((prev) => ({ ...prev, [trade.id]: newStatus }));
     setError(null);
     try {
       await updateTrade(trade.id, { status: newStatus, projectId });
       router.refresh();
     } catch {
+      setOptimisticStatuses((prev) => ({ ...prev, [trade.id]: prevStatus }));
       setError("狀態更新失敗，請重試");
-    } finally {
-      setUpdatingId(null);
     }
   };
 
@@ -78,7 +81,7 @@ export function TradeList({
         <div className="px-4 py-2 text-xs text-destructive bg-red-50">{error}</div>
       )}
       {trades.map((trade) => {
-        const isUpdating = updatingId === trade.id;
+        const status = getStatus(trade);
         const isDeleting = deletingId === trade.id;
         const isSwiped = swipedId === trade.id;
 
@@ -103,10 +106,10 @@ export function TradeList({
               onClick={() => setSwipedId(isSwiped ? null : trade.id)}
             >
               {/* Status dot */}
-              <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotStyle[trade.status]}`} />
+              <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotStyle[status]}`} />
 
               <div className="flex-1 min-w-0">
-                <div className={`text-[13px] ${trade.status === "active" ? "font-semibold" : ""}`}>
+                <div className={`text-[13px] ${status === "active" ? "font-semibold" : ""}`}>
                   {trade.name}
                 </div>
                 <div className="text-[11px] text-muted-foreground">{trade.crew || "未指定工班"}</div>
@@ -120,16 +123,13 @@ export function TradeList({
 
               {/* Status dropdown */}
               <select
-                value={trade.status}
+                value={status}
                 onChange={(e) => {
                   e.stopPropagation();
                   handleStatusChange(trade, e.target.value as TradeStatus);
                 }}
                 onClick={(e) => e.stopPropagation()}
-                disabled={isUpdating}
-                className={`text-[11px] font-semibold shrink-0 pl-2 pr-5 py-1 rounded-full border appearance-none cursor-pointer transition-all ${
-                  isUpdating ? "opacity-50" : ""
-                } ${statusSelectStyle[trade.status]}`}
+                className={`text-[11px] font-semibold shrink-0 pl-2 pr-5 py-1 rounded-full border appearance-none cursor-pointer transition-all ${statusSelectStyle[status]}`}
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
                   backgroundRepeat: "no-repeat",

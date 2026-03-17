@@ -19,6 +19,7 @@ export default async function AccountPage() {
 
   const plan = profile.plan ?? "free";
   const quoteLimit = PLAN_LIMITS[plan]?.quotes ?? PLAN_LIMITS.free.quotes;
+  const projectLimit = PLAN_LIMITS[plan]?.projects ?? PLAN_LIMITS.free.projects;
   const isFreePlan = plan === "free";
 
   return (
@@ -86,9 +87,23 @@ export default async function AccountPage() {
               )}
             </div>
 
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">案件數</span>
-              <span className="font-medium">{usage.projectCount} 個</span>
+            <div>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-muted-foreground">案件數</span>
+                <span className="font-medium">
+                  {usage.projectCount} / {projectLimit === Infinity ? "無限" : projectLimit}
+                </span>
+              </div>
+              {isFreePlan && (
+                <div className="w-full bg-gray-100 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full transition-all ${
+                      usage.projectCount >= projectLimit ? "bg-destructive" : "bg-primary"
+                    }`}
+                    style={{ width: `${Math.min((usage.projectCount / projectLimit) * 100, 100)}%` }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

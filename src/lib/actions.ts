@@ -4,7 +4,7 @@ import { supabase } from "./supabase";
 import { revalidatePath } from "next/cache";
 import { ProjectRow, QuoteRow } from "./database.types";
 import { getUserId } from "./auth";
-import { canCreateQuote } from "./queries";
+import { canCreateQuote, canCreateProject } from "./queries";
 
 // ===== Projects =====
 
@@ -15,6 +15,11 @@ export async function createProject(data: {
 }): Promise<ProjectRow> {
   const userId = await getUserId();
   if (!userId) throw new Error("請先登入");
+
+  const allowed = await canCreateProject();
+  if (!allowed) {
+    throw new Error("免費方案最多建立 1 個案件，請升級為專業版");
+  }
 
   const { data: project, error } = await supabase
     .from("projects")

@@ -1,12 +1,15 @@
 import { ProjectCard } from "@/components/project-card";
-import { getProjects } from "@/lib/queries";
+import { getProjects, canCreateProject } from "@/lib/queries";
 import { formatCurrency } from "@/lib/format";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const projects = await getProjects();
+  const [projects, canCreate] = await Promise.all([
+    getProjects(),
+    canCreateProject(),
+  ]);
 
   const activeProjects = projects.filter((p) => p.status !== "completed");
   const totalReceivable = projects
@@ -25,12 +28,21 @@ export default async function HomePage() {
           <div className="text-lg font-bold">築報工程管理</div>
           <div className="text-xs opacity-80">{projects.length} 個案件</div>
         </div>
-        <Link
-          href="/projects/new"
-          className="bg-white/20 text-white text-sm px-3 py-1.5 rounded-lg font-medium"
-        >
-          + 新案件
-        </Link>
+        {canCreate ? (
+          <Link
+            href="/projects/new"
+            className="bg-white/20 text-white text-sm px-3 py-1.5 rounded-lg font-medium"
+          >
+            + 新案件
+          </Link>
+        ) : (
+          <Link
+            href="/account"
+            className="bg-white/10 text-white/60 text-sm px-3 py-1.5 rounded-lg font-medium"
+          >
+            已達上限
+          </Link>
+        )}
       </header>
 
       <div className="grid grid-cols-2 gap-2.5 p-4">
@@ -58,14 +70,22 @@ export default async function HomePage() {
         <div className="text-sm font-semibold text-sage-800">所有案件</div>
         {projects.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
-            <div className="text-4xl mb-3">🏗️</div>
             <div className="text-sm">還沒有案件</div>
-            <Link
-              href="/projects/new"
-              className="inline-block mt-3 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium"
-            >
-              建立第一個案件
-            </Link>
+            {canCreate ? (
+              <Link
+                href="/projects/new"
+                className="inline-block mt-3 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium"
+              >
+                建立第一個案件
+              </Link>
+            ) : (
+              <Link
+                href="/account"
+                className="inline-block mt-3 text-primary text-sm font-medium"
+              >
+                升級方案以建立更多案件
+              </Link>
+            )}
           </div>
         )}
         {projects.map((project) => (

@@ -7,8 +7,8 @@ import {
 } from "./database.types";
 
 export const PLAN_LIMITS = {
-  free: { quotes: 1 },
-  pro: { quotes: Infinity },
+  free: { quotes: 1, projects: 1 },
+  pro: { quotes: Infinity, projects: Infinity },
 } as const;
 
 export interface ProjectWithRelations extends ProjectRow {
@@ -228,4 +228,16 @@ export async function canCreateQuote(): Promise<boolean> {
 
   const limit = PLAN_LIMITS[profile.plan]?.quotes ?? PLAN_LIMITS.free.quotes;
   return usage.quoteCount < limit;
+}
+
+export async function canCreateProject(): Promise<boolean> {
+  const [profile, usage] = await Promise.all([
+    getUserProfile(),
+    getUserUsage(),
+  ]);
+
+  if (!profile) return false;
+
+  const limit = PLAN_LIMITS[profile.plan]?.projects ?? PLAN_LIMITS.free.projects;
+  return usage.projectCount < limit;
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserId } from "@/lib/auth";
-import { supabase, supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { canUploadPhoto } from "@/lib/queries";
 import { v4 as uuid } from "uuid";
 import { revalidatePath } from "next/cache";
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   }
 
   // Verify project belongs to user
-  const { data: project } = await supabase
+  const { data: project } = await supabaseAdmin
     .from("projects")
     .select("id")
     .eq("id", projectId)
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
   }
 
   // Insert DB row
-  const { data: photoRow, error: dbError } = await supabase
+  const { data: photoRow, error: dbError } = await supabaseAdmin
     .from("photos")
     .insert({
       project_id: projectId,
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     // Cleanup storage on DB failure
     await supabaseAdmin.storage.from("photos").remove([filePath, thumbPath]);
     return NextResponse.json(
-      { error: "儲存照片資料失敗" },
+      { error: `儲存照片資料失敗: ${dbError.message}` },
       { status: 500 }
     );
   }

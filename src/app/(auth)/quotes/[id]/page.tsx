@@ -51,7 +51,7 @@ export default function QuoteDetailPage() {
     return <div className="p-8 text-center text-muted-foreground text-sm">找不到此報價單</div>;
   }
 
-  const grandTotal = quote.sections.reduce(
+  const displayTotal = quote.sections.reduce(
     (sum, section) => sum + calculateSectionTotal(section.items, mode),
     0
   );
@@ -59,8 +59,12 @@ export default function QuoteDetailPage() {
     (sum, section) => sum + calculateSectionTotal(section.items, "cost"),
     0
   );
-  const profit = grandTotal - costTotal;
-  const profitMargin = grandTotal > 0 ? ((profit / grandTotal) * 100).toFixed(1) : "0";
+  const clientTotal = quote.sections.reduce(
+    (sum, section) => sum + calculateSectionTotal(section.items, "client"),
+    0
+  );
+  const profit = clientTotal - costTotal;
+  const profitMargin = clientTotal > 0 ? ((profit / clientTotal) * 100).toFixed(1) : "0";
 
   return (
     <div>
@@ -104,7 +108,7 @@ export default function QuoteDetailPage() {
           {mode === "cost" ? "成本總計" : "工程總價"}
         </span>
         <span className="text-lg font-bold text-primary">
-          {formatCurrency(grandTotal)}
+          {formatCurrency(displayTotal)}
         </span>
       </div>
 

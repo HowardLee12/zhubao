@@ -1,0 +1,102 @@
+export type ProjectRow = {
+  id: string;
+  customer_name: string;
+  address: string;
+  description: string;
+  total_amount: number;
+  status: "planning" | "in_progress" | "completed";
+  progress: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TradeRow = {
+  id: string;
+  project_id: string;
+  name: string;
+  crew: string;
+  start_date: string | null;
+  end_date: string | null;
+  status: "done" | "active" | "pending";
+  sort_order: number;
+  created_at: string;
+};
+
+export type PaymentRow = {
+  id: string;
+  project_id: string;
+  name: string;
+  percentage: number;
+  amount: number;
+  due_date: string | null;
+  status: "paid" | "due" | "upcoming" | "pending";
+  paid_date: string | null;
+  sort_order: number;
+  created_at: string;
+};
+
+export type QuoteRow = {
+  id: string;
+  project_id: string;
+  version: number;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type QuoteSectionRow = {
+  id: string;
+  quote_id: string;
+  name: string;
+  icon: string;
+  sort_order: number;
+};
+
+export type QuoteItemRow = {
+  id: string;
+  section_id: string;
+  name: string;
+  spec: string;
+  unit: string;
+  quantity: number;
+  unit_cost: number;
+  markup_percent: number;
+  sort_order: number;
+};
+
+export interface Database {
+  public: {
+    Tables: {
+      projects: {
+        Row: ProjectRow;
+        Insert: Partial<ProjectRow> & Pick<ProjectRow, "customer_name" | "address">;
+        Update: Partial<ProjectRow>;
+      };
+      trades: {
+        Row: TradeRow;
+        Insert: Partial<TradeRow> & Pick<TradeRow, "project_id" | "name">;
+        Update: Partial<TradeRow>;
+      };
+      payments: {
+        Row: PaymentRow;
+        Insert: Partial<PaymentRow> & Pick<PaymentRow, "project_id" | "name">;
+        Update: Partial<PaymentRow>;
+      };
+      quotes: {
+        Row: QuoteRow;
+        Insert: Partial<QuoteRow> & Pick<QuoteRow, "project_id">;
+        Update: Partial<QuoteRow>;
+      };
+      quote_sections: {
+        Row: QuoteSectionRow;
+        Insert: Partial<QuoteSectionRow> & Pick<QuoteSectionRow, "quote_id" | "name">;
+        Update: Partial<QuoteSectionRow>;
+      };
+      quote_items: {
+        Row: QuoteItemRow;
+        Insert: Partial<QuoteItemRow> & Pick<QuoteItemRow, "section_id" | "name">;
+        Update: Partial<QuoteItemRow>;
+      };
+    };
+  };
+}

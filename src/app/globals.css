@@ -1,26 +1,66 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --sage-50: #f6f7f4;
+  --sage-100: #e8ebe3;
+  --sage-200: #d1d7c7;
+  --sage-300: #b3bda3;
+  --sage-400: #95a37f;
+  --sage-500: #7a8b66;
+  --sage-600: #5f6e4f;
+  --sage-700: #4a5640;
+  --sage-800: #3d4636;
+  --sage-900: #333b2e;
+  --sage-950: #1a1f16;
+
+  --background: var(--sage-50);
+  --foreground: var(--sage-950);
+  --card: #ffffff;
+  --card-foreground: var(--sage-900);
+  --primary: var(--sage-600);
+  --primary-foreground: #ffffff;
+  --muted: var(--sage-100);
+  --muted-foreground: var(--sage-500);
+  --border: var(--sage-200);
+  --accent: var(--sage-100);
+  --destructive: #dc2626;
+  --warning: #d97706;
+  --success: var(--sage-600);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-sage-50: var(--sage-50);
+  --color-sage-100: var(--sage-100);
+  --color-sage-200: var(--sage-200);
+  --color-sage-300: var(--sage-300);
+  --color-sage-400: var(--sage-400);
+  --color-sage-500: var(--sage-500);
+  --color-sage-600: var(--sage-600);
+  --color-sage-700: var(--sage-700);
+  --color-sage-800: var(--sage-800);
+  --color-sage-900: var(--sage-900);
+  --color-sage-950: var(--sage-950);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  position: relative;
 }

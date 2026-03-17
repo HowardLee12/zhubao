@@ -98,15 +98,36 @@ export default async function AccountPage() {
       {isFreePlan && (
         <div className="px-4 pb-4">
           <div className="bg-sage-50 border border-sage-200 rounded-xl p-4">
-            <div className="text-sm font-bold text-sage-800 mb-1">升級專業版</div>
-            <div className="text-xs text-sage-600 mb-3">
-              無限報價單、無限案件，解鎖所有功能
+            <div className="flex justify-between items-start mb-2">
+              <div className="text-sm font-bold text-sage-800">升級專業版</div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-primary">NT$599</div>
+                <div className="text-[10px] text-muted-foreground">/ 月</div>
+              </div>
+            </div>
+            <div className="text-xs text-sage-600 space-y-1 mb-3">
+              <div className="flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
+                <span>無限報價單</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
+                <span>無限案件管理</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
+                <span>報價分享給屋主</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
+                <span>工班排程通知</span>
+              </div>
             </div>
             <button
               disabled
               className="w-full bg-primary text-primary-foreground py-2.5 rounded-xl font-semibold text-sm opacity-50 cursor-not-allowed"
             >
-              即將推出
+              即將開放
             </button>
           </div>
         </div>

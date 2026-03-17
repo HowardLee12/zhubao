@@ -1,8 +1,8 @@
-# 裝潢工程管理系統 — Reno Demo
+# 築報工程管理 — Reno Demo
 
 ## Project Overview
 
-Taiwan renovation industry SaaS tool — mobile-first web app for small (1-5 person) renovation studios. Core feature: **dual-version quoting** (cost version for designer, client version for homeowner) with automatic markup calculation. Will integrate with LINE (LIFF) as primary distribution channel.
+Taiwan renovation industry SaaS tool — mobile-first web app for small (1-5 person) renovation studios. Core feature: **dual-version quoting** (cost version for designer, client version for homeowner) with automatic markup calculation. Integrates with LINE (LIFF) as primary distribution channel.
 
 - **Color theme**: Sage Green
 - **Language**: Traditional Chinese (zh-TW)
@@ -13,42 +13,60 @@ Taiwan renovation industry SaaS tool — mobile-first web app for small (1-5 per
 - **Framework**: Next.js 16.1.7 (App Router, TypeScript, Turbopack)
 - **Styling**: Tailwind CSS v4 with custom Sage Green theme
 - **Database**: Supabase (PostgreSQL) — free tier
-- **Auth**: Pending (will use LINE LIFF auth → Supabase RLS)
-- **Deployment**: Pending (planned: Vercel)
+- **Auth**: LINE LIFF SDK → Supabase (login via LINE in external browser + in-app browser)
+- **Deployment**: Vercel
 
 ## Project Structure
 
 ```
 src/
 ├── app/
-│   ├── page.tsx              # Dashboard — stats cards + project list
-│   ├── projects/
-│   │   ├── new/page.tsx      # Create project form (client-side)
-│   │   └── [id]/page.tsx     # Project detail — trades + payments
-│   ├── quotes/
-│   │   ├── page.tsx          # Quotes list — grouped by project
-│   │   ├── new/page.tsx      # Quote builder (supports clone via ?cloneFrom=)
-│   │   └── [id]/page.tsx     # Quote detail — cost/client toggle
-│   ├── schedule/page.tsx     # Trade scheduling with conflict detection
-│   ├── payments/page.tsx     # Payment tracking
-│   └── api/quotes/[id]/      # Quote data API route
+│   ├── layout.tsx            # Root layout (no auth, just html/body)
+│   ├── (auth)/               # Route group — requires LINE LIFF login
+│   │   ├── layout.tsx        # LiffProvider + AuthGuard + BottomNav
+│   │   ├── page.tsx          # Dashboard — stats cards + project list
+│   │   ├── loading.tsx       # Dashboard skeleton screen
+│   │   ├── projects/
+│   │   │   ├── new/page.tsx  # Create project form (client-side)
+│   │   │   └── [id]/page.tsx # Project detail — trades + payments
+│   │   ├── quotes/
+│   │   │   ├── page.tsx      # Quotes list — grouped by project
+│   │   │   ├── loading.tsx   # Quotes skeleton screen
+│   │   │   ├── new/page.tsx  # Quote builder (supports clone via ?cloneFrom=)
+│   │   │   └── [id]/page.tsx # Quote detail — cost/client toggle + share
+│   │   ├── schedule/
+│   │   │   ├── page.tsx      # Trade scheduling with conflict detection
+│   │   │   └── loading.tsx   # Schedule skeleton screen
+│   │   ├── payments/
+│   │   │   ├── page.tsx      # Payment tracking
+│   │   │   └── loading.tsx   # Payments skeleton screen
+│   │   └── account/
+│   │       └── page.tsx      # Account page — profile, plan, usage, logout
+│   ├── (public)/             # Route group — no auth required
+│   │   ├── layout.tsx        # Passthrough layout
+│   │   └── quotes/[id]/share/page.tsx  # Public quote share page for homeowners
+│   └── api/quotes/[id]/      # Quote data API route (auth + ownership check)
 ├── components/
-│   ├── bottom-nav.tsx        # Bottom tab navigation
+│   ├── bottom-nav.tsx        # Bottom tab navigation (with prefetch)
+│   ├── liff-provider.tsx     # LINE LIFF SDK init + login trigger
+│   ├── auth-guard.tsx        # Auth gate — shows login prompt or children
 │   ├── project-card.tsx      # Project summary card
-│   ├── project-header.tsx     # Project header with edit/delete buttons
-│   ├── edit-project-form.tsx  # Inline edit project info form
+│   ├── project-header.tsx    # Project header with edit/delete buttons
+│   ├── edit-project-form.tsx # Inline edit project info form
 │   ├── project-status-control.tsx # Status pills + progress slider
 │   ├── project-quotes-section.tsx # Inline quote list + builder toggle
 │   ├── inline-quote-builder.tsx   # Inline quote creation (no page navigation)
-│   ├── trade-list.tsx        # Interactive trade list (status toggle + swipe delete)
+│   ├── trade-list.tsx        # Interactive trade list (status dropdown + swipe delete/notify)
 │   ├── payment-list.tsx      # Interactive payment list (paid toggle + swipe delete)
 │   ├── add-trade-form.tsx    # Add new trade form
 │   ├── add-payment-form.tsx  # Add new payment form
 │   ├── schedule-trade-card.tsx # Schedule page trade card (status toggle + project link)
 │   ├── quote-section-card.tsx # Quote section display
-│   └── quote-version-toggle.tsx # Cost/client version switch
+│   ├── quote-version-toggle.tsx # Cost/client version switch
+│   └── logout-button.tsx     # Logout button (clears cookies + LIFF logout)
 ├── lib/
 │   ├── supabase.ts           # Supabase client (untyped, anon key)
+│   ├── liff.ts               # LINE LIFF SDK wrapper (init, login, share, isInitialized)
 │   ├── database.types.ts     # Explicit TypeScript types for DB rows
 │   ├── queries.ts            # Data access layer (getProjects, getQuote, etc.)
 │   ├── actions.ts            # Server actions (CRUD operations)
@@ -60,12 +78,13 @@ src/
 
 ## Database Tables
 
-1. **projects** — customer info, status, progress, total amount
-2. **trades** — trade scheduling (crew, dates, status)
-3. **payments** — payment milestones and tracking
-4. **quotes** — versioned quotes per project
-5. **quote_sections** — categorized sections (拆除, 水電, 泥作, etc.)
-6. **quote_items** — line items with unit cost + markup %
+1. **users** — LINE user profile, plan (`free`/`pro`)
+2. **projects** — customer info, status, progress, total amount
+3. **trades** — trade scheduling (crew, dates, status)
+4. **payments** — payment milestones and tracking
+5. **quotes** — versioned quotes per project
+6. **quote_sections** — categorized sections (拆除, 水電, 泥作, etc.)
+7. **quote_items** — line items with unit cost + markup %
 
 ## Key Features (Implemented)
 
@@ -91,14 +110,26 @@ src/
 - [x] **Project info editing** — edit customer name, address, description inline
 - [x] **Delete project** — with confirmation dialog, cascading delete
 - [x] **Quotes list empty state** — links to project list page
+- [x] **LINE LIFF SDK integration** — login via LINE in both in-app and external browser
+- [x] **Route groups** — `(auth)` for authenticated pages, `(public)` for unauthenticated (e.g. share page)
+- [x] **Share quote to homeowner** — Web Share API (native iPhone share sheet) with LINE LIFF `shareTargetPicker` fallback
+- [x] **Public quote share page** — `/quotes/[id]/share` pre-computes client prices, cost data never enters render tree
+- [x] **Share trade schedule to contractor** — swipe to reveal "通知" button, native share with project/date/crew info
+- [x] **Loading skeletons** — skeleton screens on dashboard, quotes, schedule, payments pages
+- [x] **Optimistic updates** — trade status + schedule status update UI immediately, rollback on error
+- [x] **Nav prefetch** — bottom nav links use `prefetch={true}` for faster tab switching
+- [x] **API security** — `/api/quotes/[id]` has auth + ownership check, UUID validation
+- [x] **Vercel deployment** — production deploy with env vars
+- [x] **Account page** — profile display, plan info, usage stats, logout
+- [x] **Free plan quota** — free users limited to 1 quote, enforced in server action + UI
+- [x] **Bottom nav restructured** — 案件, 排程, 收款, 帳號 (removed 報價單 tab)
 
 ## Pending Work
-- [ ] **LINE LIFF SDK integration** — embed app in LINE, auth via LINE login
-- [ ] **Supabase auth + RLS** — user-scoped data after LINE auth
+- [ ] **Supabase RLS tightening** — currently open policies (`USING (true)`), need user-scoped RLS
+- [ ] **Child resource ownership checks** — trades, payments, quote items mutations need ownership verification via parent project
 - [ ] **Input validation** — zod schemas for server actions
 - [ ] **Transactional writes** — atomic quote creation via Postgres function
-- [ ] **Vercel deployment** — production deploy with env vars
-- [ ] **Share quote via LINE** — generate client-version link
+- [ ] **施工照片管理** — construction photo management (top feature gap from user survey)
 
 ## Known Technical Decisions
 
@@ -106,6 +137,10 @@ src/
 - **Separate queries instead of joins**: Avoids Supabase type inference issues with relational queries.
 - **RLS open policies**: Temporary — will tighten when LINE LIFF auth is added.
 - **No transaction on quote creation**: Sequential inserts across 3 tables. Needs Postgres function for atomicity.
+- **LIFF login in external browser**: `isInLiff()` returns false in external browser. Use `isInitialized() && !isLoggedIn()` to trigger login universally.
+- **Route groups for auth**: `(auth)/` wraps pages with LiffProvider + AuthGuard; `(public)/` has no auth. Root layout is bare.
+- **Public share page security**: `toClientView()` pre-computes client prices so `unit_cost`/`markup_percent` never enter the React render tree.
+- **Plan-based quotas**: `PLAN_LIMITS` in `queries.ts` defines per-plan limits. `canCreateQuote()` checks count vs limit. Server action enforces; UI hides create buttons.
 
 ## Development
 
@@ -118,4 +153,5 @@ Environment variables needed in `.env.local`:
 ```
 NEXT_PUBLIC_SUPABASE_URL=<supabase-url>
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase-anon-key>
+NEXT_PUBLIC_LIFF_ID=<line-liff-id>
 ```

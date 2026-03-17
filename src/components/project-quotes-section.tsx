@@ -8,9 +8,11 @@ import type { QuoteRow } from "@/lib/database.types";
 export function ProjectQuotesSection({
   projectId,
   quotes,
+  canCreate = true,
 }: {
   projectId: string;
   quotes: QuoteRow[];
+  canCreate?: boolean;
 }) {
   const [showBuilder, setShowBuilder] = useState(false);
   const [cloneFromId, setCloneFromId] = useState<string | undefined>(undefined);
@@ -39,22 +41,38 @@ export function ProjectQuotesSection({
     <>
       <div className="flex justify-between items-center mb-3">
         <div className="text-sm font-semibold text-sage-800">報價單</div>
-        <button
-          onClick={handleNewQuote}
-          className="text-xs text-primary font-medium"
-        >
-          + 建立報價
-        </button>
+        {canCreate && (
+          <button
+            onClick={handleNewQuote}
+            className="text-xs text-primary font-medium"
+          >
+            + 建立報價
+          </button>
+        )}
       </div>
 
-      {quotes.length === 0 ? (
+      {!canCreate && quotes.length === 0 && (
+        <div className="text-center py-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
+          免費方案最多 1 張報價單，請至帳號頁升級
+        </div>
+      )}
+
+      {!canCreate && quotes.length > 0 && (
+        <div className="mb-2 text-center py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
+          已達免費方案上限，升級後可建立更多報價
+        </div>
+      )}
+
+      {canCreate && quotes.length === 0 && (
         <button
           onClick={handleNewQuote}
           className="block w-full text-center py-3 border-2 border-dashed border-sage-300 rounded-xl text-sm text-sage-500 font-medium"
         >
           + 建立第一份報價單
         </button>
-      ) : (
+      )}
+
+      {quotes.length > 0 && (
         <div className="space-y-2">
           <div className="flex gap-2 overflow-x-auto pb-1">
             {quotes.map((q) => (
@@ -72,12 +90,14 @@ export function ProjectQuotesSection({
           </div>
 
           {/* Clone from latest version */}
-          <button
-            onClick={() => handleCloneQuote(quotes[0].id)}
-            className="w-full py-2 text-xs text-primary font-medium border border-dashed border-sage-300 rounded-xl"
-          >
-            + 以 v{quotes[0].version} 建立新版本
-          </button>
+          {canCreate && (
+            <button
+              onClick={() => handleCloneQuote(quotes[0].id)}
+              className="w-full py-2 text-xs text-primary font-medium border border-dashed border-sage-300 rounded-xl"
+            >
+              + 以 v{quotes[0].version} 建立新版本
+            </button>
+          )}
         </div>
       )}
     </>

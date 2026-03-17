@@ -3,7 +3,13 @@ import { getUserId } from "./auth";
 import {
   ProjectRow, TradeRow, PaymentRow,
   QuoteRow, QuoteSectionRow, QuoteItemRow,
+  UserRow,
 } from "./database.types";
+
+export const PLAN_LIMITS = {
+  free: { quotes: 1 },
+  pro: { quotes: Infinity },
+} as const;
 
 export interface ProjectWithRelations extends ProjectRow {
   trades: TradeRow[];
@@ -167,4 +173,59 @@ export async function getAllQuotesWithProjects(): Promise<QuoteWithProject[]> {
     ...q,
     project: projectMap.get(q.project_id) ?? null,
   }));
+}
+
+export async function getUserProfile(): Promise<UserRow | null> {
+  const userId = await getUserId();
+  if (!userId) return null;
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", userId)
+    .single();
+
+  if (error) return null;
+  return data as UserRow;
+}
+
+export interface UserUsage {
+  quoteCount: number;
+  projectCount: number;
+}
+
+export async function getUserUsage(): Promise<UserUsage> {
+  const userId = await getUserId();
+  if (!userId) return { quoteCount: 0, projectCount: 0 };
+
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("user_id", userId);
+
+  const projectIds = ((projects ?? []) as { id: string }[]).map((p) => p.id);
+
+  if (projectIds.length === 0) return { quoteCount: 0, projectCount: projectIds.length };
+
+  const { count } = await supabase
+    .from("quotes")
+    .select("id", { count: "exact", head: true })
+    .in("project_id", projectIds);
+
+  return {
+    quoteCount: count ?? 0,
+    projectCount: projectIds.length,
+  };
+}
+
+export async function canCreateQuote(): Promise<boolean> {
+  const [profile, usage] = await Promise.all([
+    getUserProfile(),
+    getUserUsage(),
+  ]);
+
+  if (!profile) return false;
+
+  const limit = PLAN_LIMITS[profile.plan]?.quotes ?? PLAN_LIMITS.free.quotes;
+  return usage.quoteCount < limit;
 }

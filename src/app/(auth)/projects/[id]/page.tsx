@@ -1,4 +1,4 @@
-import { getProject, getQuotesByProject } from "@/lib/queries";
+import { getProject, getQuotesByProject, canCreateQuote } from "@/lib/queries";
 import { notFound } from "next/navigation";
 import { AddTradeForm } from "@/components/add-trade-form";
 import { AddPaymentForm } from "@/components/add-payment-form";
@@ -12,9 +12,10 @@ export const dynamic = "force-dynamic";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [project, quotes] = await Promise.all([
+  const [project, quotes, canCreate] = await Promise.all([
     getProject(id),
     getQuotesByProject(id),
+    canCreateQuote(),
   ]);
   if (!project) return notFound();
 
@@ -33,7 +34,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
       {/* Quotes for this project */}
       <div className="px-4 pb-4">
-        <ProjectQuotesSection projectId={project.id} quotes={quotes} />
+        <ProjectQuotesSection projectId={project.id} quotes={quotes} canCreate={canCreate} />
       </div>
 
       {/* Trades section */}

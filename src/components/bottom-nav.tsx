@@ -43,11 +43,20 @@ function IconDollarSign({ className }: { className?: string }) {
   );
 }
 
+function IconUser({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
 const navItems = [
   { href: "/", icon: IconHome, label: "案件" },
-  { href: "/quotes", icon: IconFileText, label: "報價單" },
   { href: "/schedule", icon: IconCalendar, label: "排程" },
   { href: "/payments", icon: IconDollarSign, label: "收款" },
+  { href: "/account", icon: IconUser, label: "帳號" },
 ];
 
 export function BottomNav() {

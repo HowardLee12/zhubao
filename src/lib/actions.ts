@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 import { revalidatePath } from "next/cache";
 import { ProjectRow, QuoteRow } from "./database.types";
 import { getUserId } from "./auth";
+import { canCreateQuote } from "./queries";
 
 // ===== Projects =====
 
@@ -98,6 +99,12 @@ export async function createQuoteWithSections(data: {
     }[];
   }[];
 }): Promise<QuoteRow> {
+  // Check quota for free users
+  const allowed = await canCreateQuote();
+  if (!allowed) {
+    throw new Error("免費方案最多建立 1 張報價單，請升級為專業版");
+  }
+
   // Get next version number
   const { data: existing } = await supabase
     .from("quotes")

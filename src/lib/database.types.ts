@@ -1,8 +1,11 @@
+export type UserPlan = "free" | "pro";
+
 export type UserRow = {
   id: string;
   line_user_id: string;
   display_name: string;
   picture_url: string;
+  plan: UserPlan;
   created_at: string;
   updated_at: string;
 };

@@ -1,6 +1,6 @@
 "use server";
 
-import { supabase } from "./supabase";
+import { supabase, supabaseAdmin } from "./supabase";
 import { revalidatePath } from "next/cache";
 import { ProjectRow, QuoteRow } from "./database.types";
 import { getUserId } from "./auth";
@@ -79,10 +79,10 @@ export async function deleteProject(id: string) {
 
   // Clean up photos from storage before cascading delete
   const storagePath = `${userId}/${id}`;
-  const { data: files } = await supabase.storage.from("photos").list(storagePath);
+  const { data: files } = await supabaseAdmin.storage.from("photos").list(storagePath);
   if (files && files.length > 0) {
     const paths = files.map((f) => `${storagePath}/${f.name}`);
-    await supabase.storage.from("photos").remove(paths);
+    await supabaseAdmin.storage.from("photos").remove(paths);
   }
 
   const { error } = await supabase
@@ -423,7 +423,7 @@ export async function deletePhoto(photoId: string, projectId: string) {
   // Delete from storage
   const paths = [photo.file_path, photo.thumbnail_path].filter(Boolean);
   if (paths.length > 0) {
-    await supabase.storage.from("photos").remove(paths);
+    await supabaseAdmin.storage.from("photos").remove(paths);
   }
 
   // Delete DB row

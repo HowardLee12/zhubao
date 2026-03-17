@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserId } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { canUploadPhoto } from "@/lib/queries";
 import { v4 as uuid } from "uuid";
 import { revalidatePath } from "next/cache";
@@ -52,21 +52,22 @@ export async function POST(request: Request) {
   const thumbBuffer = Buffer.from(await thumbnail.arrayBuffer());
 
   const [photoUpload, thumbUpload] = await Promise.all([
-    supabase.storage.from("photos").upload(filePath, photoBuffer, {
+    supabaseAdmin.storage.from("photos").upload(filePath, photoBuffer, {
       contentType: photo.type || "image/webp",
       upsert: false,
     }),
-    supabase.storage.from("photos").upload(thumbPath, thumbBuffer, {
+    supabaseAdmin.storage.from("photos").upload(thumbPath, thumbBuffer, {
       contentType: thumbnail.type || "image/webp",
       upsert: false,
     }),
   ]);
 
   if (photoUpload.error || thumbUpload.error) {
+    const errMsg = photoUpload.error?.message || thumbUpload.error?.message || "Unknown";
     // Cleanup any partial uploads
-    await supabase.storage.from("photos").remove([filePath, thumbPath]);
+    await supabaseAdmin.storage.from("photos").remove([filePath, thumbPath]);
     return NextResponse.json(
-      { error: "上傳失敗，請重試" },
+      { error: `上傳失敗: ${errMsg}` },
       { status: 500 }
     );
   }
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
 
   if (dbError) {
     // Cleanup storage on DB failure
-    await supabase.storage.from("photos").remove([filePath, thumbPath]);
+    await supabaseAdmin.storage.from("photos").remove([filePath, thumbPath]);
     return NextResponse.json(
       { error: "儲存照片資料失敗" },
       { status: 500 }

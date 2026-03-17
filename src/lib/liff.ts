@@ -25,6 +25,10 @@ export function getAccessToken(): string | null {
   return liff.getAccessToken();
 }
 
+export function isInitialized(): boolean {
+  return initialized;
+}
+
 export function isInLiff(): boolean {
   return initialized && liff.isInClient();
 }

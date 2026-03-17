@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, createContext, useContext, useState, useCallback } from "react";
-import { initLiff, isLoggedIn, getProfile, getAccessToken, isInLiff, login } from "@/lib/liff";
+import { initLiff, isLoggedIn, getProfile, getAccessToken, isInLiff, isInitialized, login } from "@/lib/liff";
 
 interface UserInfo {
   id: string;
@@ -58,9 +58,10 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
       await initLiff();
       addLog(`initLiff done. isInLiff=${isInLiff()}, isLoggedIn=${isLoggedIn()}`);
 
-      // If in LIFF but not logged in, trigger LINE login
-      if (isInLiff() && !isLoggedIn()) {
-        addLog("In LIFF but not logged in → calling login()");
+      // If LIFF initialized but not logged in, trigger LINE login
+      // (works in both LINE's in-app browser and external browser)
+      if (isInitialized() && !isLoggedIn()) {
+        addLog("LIFF initialized but not logged in → calling login()");
         login();
         return;
       }

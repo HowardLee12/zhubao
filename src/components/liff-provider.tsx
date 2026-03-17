@@ -13,12 +13,14 @@ interface LiffContextValue {
   ready: boolean;
   user: UserInfo | null;
   loading: boolean;
+  debugLog: string[];
 }
 
 const LiffContext = createContext<LiffContextValue>({
   ready: false,
   user: null,
   loading: true,
+  debugLog: [],
 });
 
 export function useLiff() {
@@ -37,70 +39,100 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
     ready: false,
     user: null,
     loading: true,
+    debugLog: [],
   });
 
   const initialize = useCallback(async () => {
-    const alreadyLoggedIn = hasCookie("zhubao_logged_in");
+    const log: string[] = [];
+    const addLog = (msg: string) => {
+      log.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+      setState((prev) => ({ ...prev, debugLog: [...log] }));
+    };
 
-    await initLiff();
+    try {
+      const alreadyLoggedIn = hasCookie("zhubao_logged_in");
+      addLog(`cookie zhubao_logged_in: ${alreadyLoggedIn}`);
+      addLog(`LIFF_ID: ${process.env.NEXT_PUBLIC_LIFF_ID ?? "(empty)"}`);
 
-    // If in LIFF but not logged in, trigger LINE login
-    if (isInLiff() && !isLoggedIn()) {
-      login();
-      return;
-    }
+      addLog("initLiff()...");
+      await initLiff();
+      addLog(`initLiff done. isInLiff=${isInLiff()}, isLoggedIn=${isLoggedIn()}`);
 
-    // If LIFF logged in but no server cookie, authenticate with backend
-    if (isLoggedIn() && !alreadyLoggedIn) {
-      const accessToken = getAccessToken();
-      if (accessToken) {
-        try {
-          const res = await fetch("/api/auth", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ accessToken }),
-          });
-          if (res.ok) {
-            // Reload so server components pick up the cookie
-            const reloadCount = parseInt(sessionStorage.getItem(RELOAD_KEY) ?? "0", 10);
-            if (reloadCount < MAX_RELOADS) {
-              sessionStorage.setItem(RELOAD_KEY, String(reloadCount + 1));
-              globalThis.location.reload();
-              return;
-            }
-            // Max reloads reached — show error
-            setState({ ready: true, user: null, loading: false });
-            return;
-          }
-        } catch {
-          // Fall through to non-auth state
-        }
-      }
-    }
-
-    // If already authenticated, get profile for display
-    if (isLoggedIn() && alreadyLoggedIn) {
-      // Clear reload counter on successful load
-      sessionStorage.removeItem(RELOAD_KEY);
-
-      const profile = await getProfile();
-      if (profile) {
-        setState({
-          ready: true,
-          user: {
-            id: "",  // ID comes from server, not needed client-side
-            displayName: profile.displayName,
-            pictureUrl: profile.pictureUrl,
-          },
-          loading: false,
-        });
+      // If in LIFF but not logged in, trigger LINE login
+      if (isInLiff() && !isLoggedIn()) {
+        addLog("In LIFF but not logged in → calling login()");
+        login();
         return;
       }
-    }
 
-    // Not in LIFF or not logged in
-    sessionStorage.removeItem(RELOAD_KEY);
-    setState({ ready: true, user: null, loading: false });
+      // If LIFF logged in but no server cookie, authenticate with backend
+      if (isLoggedIn() && !alreadyLoggedIn) {
+        const accessToken = getAccessToken();
+        addLog(`accessToken: ${accessToken ? accessToken.substring(0, 10) + "..." : "null"}`);
+
+        if (accessToken) {
+          addLog("POST /api/auth...");
+          try {
+            const res = await fetch("/api/auth", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ accessToken }),
+            });
+            addLog(`/api/auth response: ${res.status}`);
+
+            if (res.ok) {
+              const reloadCount = parseInt(sessionStorage.getItem(RELOAD_KEY) ?? "0", 10);
+              addLog(`reloadCount: ${reloadCount}/${MAX_RELOADS}`);
+
+              if (reloadCount < MAX_RELOADS) {
+                sessionStorage.setItem(RELOAD_KEY, String(reloadCount + 1));
+                addLog("Reloading page...");
+                globalThis.location.reload();
+                return;
+              }
+              addLog("Max reloads reached — stuck");
+              setState({ ready: true, user: null, loading: false, debugLog: log });
+              return;
+            } else {
+              const errText = await res.text();
+              addLog(`/api/auth error body: ${errText}`);
+            }
+          } catch (err) {
+            addLog(`/api/auth fetch error: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+      }
+
+      // If already authenticated, get profile for display
+      if (isLoggedIn() && alreadyLoggedIn) {
+        sessionStorage.removeItem(RELOAD_KEY);
+        addLog("Has cookie + logged in → getProfile()...");
+
+        const profile = await getProfile();
+        addLog(`profile: ${profile ? profile.displayName : "null"}`);
+
+        if (profile) {
+          setState({
+            ready: true,
+            user: {
+              id: "",
+              displayName: profile.displayName,
+              pictureUrl: profile.pictureUrl,
+            },
+            loading: false,
+            debugLog: log,
+          });
+          return;
+        }
+      }
+
+      addLog("Final state: not authenticated");
+      sessionStorage.removeItem(RELOAD_KEY);
+      setState({ ready: true, user: null, loading: false, debugLog: log });
+    } catch (err) {
+      log.push(`FATAL: ${err instanceof Error ? err.message : String(err)}`);
+      setState({ ready: true, user: null, loading: false, debugLog: log });
+    }
   }, []);
 
   useEffect(() => {

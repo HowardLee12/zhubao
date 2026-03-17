@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "裝潢工程管理系統",
+  title: "築報工程管理",
   description: "LINE 整合的裝潢工程管理平台 — 報價、排程、收款、照片一站搞定",
 };
 

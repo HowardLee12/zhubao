@@ -22,7 +22,7 @@ export default async function HomePage() {
     <div>
       <header className="bg-primary text-primary-foreground px-4 py-4 flex justify-between items-center">
         <div>
-          <div className="text-lg font-bold">裝潢工程管理</div>
+          <div className="text-lg font-bold">築報工程管理</div>
           <div className="text-xs opacity-80">{projects.length} 個案件</div>
         </div>
         <Link

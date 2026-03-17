@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>裝潢工程管理系統 - 概念展示</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --line-green: #06C755;
+  --bg: #F5F5F5;
+  --white: #FFFFFF;
+  --accent: #E67E22;
+  --accent-light: #FDF2E9;
+  --blue: #3498DB;
+  --danger: #E74C3C;
+  --warning: #F39C12;
+  --success: #27AE60;
+  --text: #2C3E50;
+  --text-light: #7F8C8D;
+  --border: #E0E0E0;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.demo-banner {
+  background: linear-gradient(135deg, var(--accent), #D35400);
+  color: white;
+  text-align: center;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.header {
+  background: var(--white);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-title { font-size: 17px; font-weight: 700; }
+.header-subtitle { font-size: 11px; color: var(--text-light); }
+.header-logo {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--accent), #D35400);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+
+.screen { display: none; padding-bottom: 80px; animation: fadeIn 0.3s ease; }
+.screen.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Bottom Nav */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 430px; background: var(--white);
+  display: flex; border-top: 1px solid var(--border); z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.nav-item {
+  flex: 1; text-align: center; padding: 8px 0 6px; cursor: pointer;
+  border: none; background: none; font-family: inherit; position: relative;
+}
+.nav-item .nav-icon { font-size: 22px; display: block; }
+.nav-item .nav-label { font-size: 10px; color: var(--text-light); margin-top: 2px; }
+.nav-item.active .nav-icon { color: var(--accent); }
+.nav-item.active .nav-label { color: var(--accent); font-weight: 600; }
+.nav-item .badge {
+  position: absolute; top: 4px; right: calc(50% - 18px);
+  background: var(--danger); color: white; font-size: 10px;
+  padding: 1px 5px; border-radius: 10px; font-weight: 600;
+}
+
+/* Section */
+.section { padding: 16px; }
+.section-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+
+/* Filter tabs */
+.filter-tabs { display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.filter-tab {
+  padding: 6px 14px; border-radius: 16px; font-size: 13px; white-space: nowrap;
+  cursor: pointer; border: 1px solid var(--border); background: var(--white);
+  color: var(--text); font-family: inherit; transition: all 0.2s;
+}
+.filter-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+/* Cards */
+.card {
+  background: var(--white); border-radius: 12px; margin: 0 16px 12px;
+  padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+/* Stats */
+.stats-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+.stat-card { background: var(--white); padding: 14px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.stat-label { font-size: 11px; color: var(--text-light); margin-bottom: 4px; }
+.stat-value { font-size: 24px; font-weight: 700; }
+.stat-change { font-size: 11px; margin-top: 2px; }
+.stat-change.up { color: var(--success); }
+.stat-change.down { color: var(--danger); }
+
+/* Tag */
+.tag { font-size: 11px; padding: 2px 8px; border-radius: 8px; font-weight: 500; }
+.tag-progress { background: #EBF5FB; color: var(--blue); }
+.tag-waiting { background: #FEF9E7; color: var(--warning); }
+.tag-done { background: #EAFAF1; color: var(--success); }
+.tag-overdue { background: #FDEDEC; color: var(--danger); }
+
+/* Progress bar */
+.progress-bar { flex: 1; height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 4px; }
+
+/* ===== LINE Chat ===== */
+.line-header {
+  background: var(--line-green); color: white; padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.line-header-avatar {
+  width: 40px; height: 40px; background: rgba(255,255,255,0.3);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;
+}
+.line-header-name { font-size: 16px; font-weight: 600; }
+.line-header-status { font-size: 11px; opacity: 0.85; }
+.chat-area { padding: 16px; background: #8CABD9; min-height: 380px; }
+.chat-msg { display: flex; margin-bottom: 12px; gap: 8px; }
+.chat-msg.bot { justify-content: flex-start; }
+.chat-msg.user { justify-content: flex-end; }
+.chat-avatar {
+  width: 32px; height: 32px; border-radius: 50%; background: var(--white);
+  display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0;
+}
+.chat-bubble {
+  max-width: 75%; padding: 10px 14px; border-radius: 16px;
+  font-size: 14px; line-height: 1.5; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+.chat-msg.bot .chat-bubble { background: var(--white); border-top-left-radius: 4px; }
+.chat-msg.user .chat-bubble { background: var(--line-green); color: white; border-top-right-radius: 4px; }
+.chat-time { font-size: 10px; color: rgba(255,255,255,0.7); margin-top: 4px; text-align: right; }
+
+/* Photo grid in chat */
+.photo-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px;
+  border-radius: 10px; overflow: hidden; margin-top: 8px; max-width: 260px;
+}
+.photo-placeholder {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+
+/* LINE Rich Menu */
+.line-rich-menu {
+  background: var(--white); display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1px; border-top: 1px solid var(--border);
+}
+.rich-menu-item {
+  padding: 16px 8px; text-align: center; cursor: pointer;
+  border: none; background: var(--white); font-family: inherit;
+}
+.rich-menu-item:active { background: #f0f0f0; }
+.rich-menu-item .rm-icon { font-size: 28px; display: block; margin-bottom: 6px; }
+.rich-menu-item .rm-label { font-size: 12px; color: var(--text); font-weight: 500; }
+
+/* ===== Project Cards ===== */
+.project-card {
+  background: var(--white); border-radius: 12px; margin: 0 16px 12px;
+  overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.project-card-header {
+  padding: 14px 16px; display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid #f5f5f5;
+}
+.project-name { font-size: 15px; font-weight: 600; }
+.project-addr { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+.project-card-body { padding: 14px 16px; }
+.project-progress { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.progress-text { font-size: 12px; font-weight: 600; min-width: 40px; text-align: right; }
+
+/* Trade timeline */
+.trade-timeline { padding: 0; }
+.trade-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 0;
+  border-bottom: 1px solid #f8f8f8; font-size: 13px;
+}
+.trade-item:last-child { border: none; }
+.trade-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.dot-done { background: var(--success); }
+.dot-active { background: var(--accent); animation: pulse 1.5s infinite; }
+.dot-pending { background: #DDD; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(230,126,34,0.4); } 50% { box-shadow: 0 0 0 6px rgba(230,126,34,0); } }
+.trade-name { flex: 1; }
+.trade-date { font-size: 11px; color: var(--text-light); }
+.trade-status { font-size: 11px; font-weight: 500; }
+
+/* ===== Quote Screen ===== */
+.quote-header {
+  padding: 16px; background: var(--white); border-bottom: 1px solid var(--border);
+}
+.quote-title { font-size: 16px; font-weight: 700; }
+.quote-meta { font-size: 12px; color: var(--text-light); margin-top: 4px; }
+.quote-section {
+  background: var(--white); margin: 12px 16px; border-radius: 12px;
+  overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.quote-section-header {
+  padding: 10px 14px; background: var(--accent-light);
+  font-size: 14px; font-weight: 600; color: var(--accent);
+  display: flex; justify-content: space-between;
+}
+.quote-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px; border-bottom: 1px solid #f8f8f8; font-size: 13px;
+}
+.quote-row:last-child { border: none; }
+.quote-item-name { flex: 1; }
+.quote-item-spec { font-size: 11px; color: var(--text-light); }
+.quote-item-price { font-weight: 600; min-width: 80px; text-align: right; }
+.quote-total {
+  padding: 14px 16px; margin: 0 16px 12px; background: var(--white);
+  border-radius: 12px; display: flex; justify-content: space-between;
+  font-size: 16px; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+/* ===== Payment Screen ===== */
+.payment-card {
+  background: var(--white); border-radius: 12px; margin: 0 16px 12px;
+  padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.payment-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.payment-customer { font-size: 15px; font-weight: 600; }
+.payment-total { font-size: 13px; color: var(--text-light); }
+
+.milestone {
+  display: flex; align-items: center; gap: 10px; padding: 10px 0;
+  border-bottom: 1px solid #f8f8f8;
+}
+.milestone:last-child { border: none; }
+.milestone-check {
+  width: 24px; height: 24px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;
+}
+.check-paid { background: var(--success); color: white; }
+.check-due { background: var(--warning); color: white; }
+.check-pending { background: #EEE; color: #BBB; }
+.milestone-info { flex: 1; }
+.milestone-name { font-size: 13px; font-weight: 500; }
+.milestone-date { font-size: 11px; color: var(--text-light); }
+.milestone-amount { font-size: 14px; font-weight: 600; }
+.milestone-amount.paid { color: var(--success); }
+.milestone-amount.due { color: var(--danger); }
+
+/* ===== Schedule Screen ===== */
+.schedule-day {
+  padding: 10px 16px; font-size: 13px; font-weight: 600;
+  color: var(--accent); background: var(--accent-light);
+}
+.schedule-card {
+  background: var(--white); margin: 8px 16px; border-radius: 12px;
+  padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  display: flex; gap: 12px; align-items: center;
+}
+.schedule-time-block {
+  text-align: center; min-width: 50px;
+}
+.schedule-time { font-size: 14px; font-weight: 700; color: var(--accent); }
+.schedule-period { font-size: 10px; color: var(--text-light); }
+.schedule-info { flex: 1; }
+.schedule-project { font-size: 14px; font-weight: 500; }
+.schedule-trade { font-size: 12px; color: var(--text-light); }
+.schedule-crew { font-size: 12px; color: var(--text-light); }
+.schedule-alert {
+  font-size: 11px; padding: 3px 8px; border-radius: 8px; font-weight: 500;
+}
+.alert-conflict { background: #FDEDEC; color: var(--danger); }
+.alert-ok { background: #EAFAF1; color: var(--success); }
+
+/* Modal */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 200; justify-content: center; align-items: flex-end;
+}
+.modal-overlay.show { display: flex; }
+.modal-content {
+  background: var(--white); border-radius: 20px 20px 0 0; width: 100%;
+  max-width: 430px; max-height: 70vh; padding: 20px; animation: slideUp 0.3s ease;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-handle { width: 40px; height: 4px; background: #DDD; border-radius: 2px; margin: 0 auto 16px; }
+.modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+.btn-primary {
+  width: 100%; padding: 14px; background: var(--accent); color: white;
+  border: none; border-radius: 12px; font-size: 15px; font-weight: 600;
+  cursor: pointer; font-family: inherit; margin-top: 12px;
+}
+.btn-secondary {
+  width: 100%; padding: 14px; background: #f0f0f0; color: var(--text-light);
+  border: none; border-radius: 12px; font-size: 15px; font-weight: 600;
+  cursor: pointer; font-family: inherit; margin-top: 8px;
+}
+</style>
+</head>
+<body>
+
+<div class="demo-banner">概念展示 — 裝潢工程 LINE 智慧管理系統</div>
+
+<div class="header">
+  <div>
+    <div class="header-title">工程管理系統</div>
+    <div class="header-subtitle">概念展示</div>
+  </div>
+  <div class="header-logo">🔨</div>
+</div>
+
+<!-- ===== SCREEN 1: LINE Homeowner View ===== -->
+<div class="screen active" id="screen-line">
+  <div class="line-header">
+    <div class="line-header-avatar">🏠</div>
+    <div>
+      <div class="line-header-name">宏達室內設計</div>
+      <div class="line-header-status">官方帳號 ・ 您的案場：信義路三段</div>
+    </div>
+  </div>
+
+  <div class="chat-area">
+    <div class="chat-msg bot">
+      <div class="chat-avatar">🏠</div>
+      <div>
+        <div class="chat-bubble">
+          林先生您好！您的案場今日施工進度更新：<br><br>
+          📍 <b>信義路三段28號4F</b><br>
+          🔨 今日工程：<b>泥作貼磚（浴室）</b><br>
+          👷 施工師傅：陳師傅<br>
+          📊 整體進度：<b>45%</b><br><br>
+          以下是今日施工照片：
+        </div>
+        <div class="photo-grid">
+          <div class="photo-placeholder" style="background:#E8D5B7;">🧱</div>
+          <div class="photo-placeholder" style="background:#BDC3C7;">🚿</div>
+          <div class="photo-placeholder" style="background:#D5DBDB;">🔧</div>
+          <div class="photo-placeholder" style="background:#E8D5B7;">✅</div>
+        </div>
+        <div class="chat-time">下午 5:30</div>
+      </div>
+    </div>
+
+    <div class="chat-msg user">
+      <div>
+        <div class="chat-bubble">看起來不錯！請問浴室大概什麼時候完工？</div>
+        <div class="chat-time">下午 5:35</div>
+      </div>
+    </div>
+
+    <div class="chat-msg bot">
+      <div class="chat-avatar">🏠</div>
+      <div>
+        <div class="chat-bubble">
+          浴室泥作預計 <b>3/18（三）</b>完成 ✅<br><br>
+          接下來的排程：<br>
+          ・3/19 衛浴設備安裝<br>
+          ・3/20-21 木作（客廳電視牆）<br>
+          ・3/24 油漆進場<br><br>
+          💰 提醒您：泥作完工後為第二期付款節點<br>
+          金額：<b>NT$360,000</b>（總價20%）<br>
+          到時會再通知您 🙏
+        </div>
+        <div class="chat-time">下午 5:36</div>
+      </div>
+    </div>
+
+    <div class="chat-msg bot">
+      <div class="chat-avatar">🏠</div>
+      <div>
+        <div class="chat-bubble">
+          💡 您可以隨時查看：<br>
+          ・即時施工進度<br>
+          ・完整報價明細<br>
+          ・付款紀錄<br>
+          ・所有施工照片<br>
+          點選下方選單即可查詢 👇
+        </div>
+        <div class="chat-time">下午 5:36</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="line-rich-menu">
+    <button class="rich-menu-item" onclick="switchScreen('projects')">
+      <span class="rm-icon">📊</span>
+      <span class="rm-label">施工進度</span>
+    </button>
+    <button class="rich-menu-item" onclick="switchScreen('quote')">
+      <span class="rm-icon">📋</span>
+      <span class="rm-label">報價明細</span>
+    </button>
+    <button class="rich-menu-item" onclick="switchScreen('payments')">
+      <span class="rm-icon">💰</span>
+      <span class="rm-label">付款紀錄</span>
+    </button>
+    <button class="rich-menu-item">
+      <span class="rm-icon">📸</span>
+      <span class="rm-label">施工照片</span>
+    </button>
+    <button class="rich-menu-item" onclick="switchScreen('schedule')">
+      <span class="rm-icon">📅</span>
+      <span class="rm-label">排程表</span>
+    </button>
+    <button class="rich-menu-item">
+      <span class="rm-icon">💬</span>
+      <span class="rm-label">聯繫設計師</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== SCREEN 2: Project Dashboard (Designer View) ===== -->
+<div class="screen" id="screen-projects">
+  <div class="section">
+    <div class="section-title">📊 案件總覽</div>
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">進行中案件</div>
+        <div class="stat-value" style="color:var(--accent)">4</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">本月營收</div>
+        <div class="stat-value" style="font-size:18px">NT$720K</div>
+        <div class="stat-change up">已收款</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">待收款項</div>
+        <div class="stat-value" style="font-size:18px; color:var(--danger)">NT$860K</div>
+        <div class="stat-change down">2筆已逾期</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">本週排程</div>
+        <div class="stat-value">12</div>
+        <div class="stat-change" style="color:var(--warning)">1個衝突</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-tabs" data-filter-group="projects">
+    <button class="filter-tab active" data-filter="all">全部</button>
+    <button class="filter-tab" data-filter="progress">施工中</button>
+    <button class="filter-tab" data-filter="waiting">待開工</button>
+    <button class="filter-tab" data-filter="done">已完工</button>
+  </div>
+
+  <!-- Project 1 -->
+  <div class="project-card" data-status="progress">
+    <div class="project-card-header">
+      <div>
+        <div class="project-name">林先生 — 信義路三段28號4F</div>
+        <div class="project-addr">3房2廳全室裝修 ・ NT$1,800,000</div>
+      </div>
+      <span class="tag tag-progress">施工中</span>
+    </div>
+    <div class="project-card-body">
+      <div class="project-progress">
+        <div class="progress-bar"><div class="progress-fill" style="width:45%; background:var(--accent);"></div></div>
+        <div class="progress-text">45%</div>
+      </div>
+      <div class="trade-timeline">
+        <div class="trade-item"><div class="trade-dot dot-done"></div><div class="trade-name">拆除清運</div><div class="trade-date">3/1-3/3</div><div class="trade-status" style="color:var(--success)">✓ 完成</div></div>
+        <div class="trade-item"><div class="trade-dot dot-done"></div><div class="trade-name">水電配管</div><div class="trade-date">3/4-3/8</div><div class="trade-status" style="color:var(--success)">✓ 完成</div></div>
+        <div class="trade-item"><div class="trade-dot dot-done"></div><div class="trade-name">鋁窗安裝</div><div class="trade-date">3/9-3/10</div><div class="trade-status" style="color:var(--success)">✓ 完成</div></div>
+        <div class="trade-item"><div class="trade-dot dot-active"></div><div class="trade-name"><b>泥作貼磚</b></div><div class="trade-date">3/11-3/18</div><div class="trade-status" style="color:var(--accent)">● 進行中</div></div>
+        <div class="trade-item"><div class="trade-dot dot-pending"></div><div class="trade-name">木作工程</div><div class="trade-date">3/20-3/28</div><div class="trade-status" style="color:var(--text-light)">待排</div></div>
+        <div class="trade-item"><div class="trade-dot dot-pending"></div><div class="trade-name">油漆工程</div><div class="trade-date">3/30-4/3</div><div class="trade-status" style="color:var(--text-light)">待排</div></div>
+        <div class="trade-item"><div class="trade-dot dot-pending"></div><div class="trade-name">清潔驗收</div><div class="trade-date">4/5</div><div class="trade-status" style="color:var(--text-light)">待排</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project 2 -->
+  <div class="project-card" data-status="progress">
+    <div class="project-card-header">
+      <div>
+        <div class="project-name">張小姐 — 復興南路一段120號12F</div>
+        <div class="project-addr">廚房+主臥翻新 ・ NT$650,000</div>
+      </div>
+      <span class="tag tag-progress">施工中</span>
+    </div>
+    <div class="project-card-body">
+      <div class="project-progress">
+        <div class="progress-bar"><div class="progress-fill" style="width:75%; background:var(--success);"></div></div>
+        <div class="progress-text">75%</div>
+      </div>
+      <div class="trade-timeline">
+        <div class="trade-item"><div class="trade-dot dot-done"></div><div class="trade-name">拆除</div><div class="trade-date">2/20-2/21</div><div class="trade-status" style="color:var(--success)">✓</div></div>
+        <div class="trade-item"><div class="trade-dot dot-done"></div><div class="trade-name">水電</div><div class="trade-date">2/24-2/26</div><div class="trade-status" style="color:var(--success)">✓</div></div>
+        <div class="trade-item"><div class="trade-dot dot-done"></div><div class="trade-name">泥作</div><div class="trade-date">2/27-3/5</div><div class="trade-status" style="color:var(--success)">✓</div></div>
+        <div class="trade-item"><div class="trade-dot dot-active"></div><div class="trade-name"><b>廚具安裝</b></div><div class="trade-date">3/13-3/15</div><div class="trade-status" style="color:var(--accent)">● 今日</div></div>
+        <div class="trade-item"><div class="trade-dot dot-pending"></div><div class="trade-name">油漆+清潔</div><div class="trade-date">3/17-3/19</div><div class="trade-status" style="color:var(--text-light)">待排</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project 3 -->
+  <div class="project-card" data-status="waiting">
+    <div class="project-card-header">
+      <div>
+        <div class="project-name">陳先生 — 民生東路五段88號3F</div>
+        <div class="project-addr">新成屋客變 ・ NT$2,200,000</div>
+      </div>
+      <span class="tag tag-waiting">待開工</span>
+    </div>
+    <div class="project-card-body">
+      <div class="project-progress">
+        <div class="progress-bar"><div class="progress-fill" style="width:0%; background:#DDD;"></div></div>
+        <div class="progress-text">0%</div>
+      </div>
+      <div style="font-size:13px; color:var(--text-light); padding:8px 0;">
+        預計開工：2026/04/01 ・ 已簽約收訂金 ・ 圖面確認中
+      </div>
+    </div>
+  </div>
+
+  <!-- Project 4 -->
+  <div class="project-card" data-status="done">
+    <div class="project-card-header">
+      <div>
+        <div class="project-name">黃太太 — 和平東路二段65號8F</div>
+        <div class="project-addr">全室翻新 ・ NT$1,350,000</div>
+      </div>
+      <span class="tag tag-done">已完工</span>
+    </div>
+    <div class="project-card-body">
+      <div class="project-progress">
+        <div class="progress-bar"><div class="progress-fill" style="width:100%; background:var(--success);"></div></div>
+        <div class="progress-text">100%</div>
+      </div>
+      <div style="font-size:13px; color:var(--success); padding:8px 0;">
+        ✅ 2026/02/28 驗收完成 ・ 尾款已收清
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCREEN 3: Quote Detail ===== -->
+<div class="screen" id="screen-quote">
+  <div class="quote-header">
+    <div class="quote-title">報價單 — 林先生 信義路案</div>
+    <div class="quote-meta">報價日期：2026/02/15 ・ 版本：v3（最終確認版）</div>
+  </div>
+
+  <div class="quote-section">
+    <div class="quote-section-header"><span>🔨 拆除工程</span><span>NT$85,000</span></div>
+    <div class="quote-row"><div><div class="quote-item-name">全室地磚拆除</div><div class="quote-item-spec">約32坪 × NT$1,500/坪</div></div><div class="quote-item-price">NT$48,000</div></div>
+    <div class="quote-row"><div><div class="quote-item-name">隔間拆除</div><div class="quote-item-spec">2面牆 含清運</div></div><div class="quote-item-price">NT$22,000</div></div>
+    <div class="quote-row"><div><div class="quote-item-name">廢棄物清運</div><div class="quote-item-spec">3車次</div></div><div class="quote-item-price">NT$15,000</div></div>
+  </div>
+
+  <div class="quote-section">
+    <div class="quote-section-header"><span>💡 水電工程</span><span>NT$180,000</span></div>
+    <div class="quote-row"><div><div class="quote-item-name">全室重新配線</div><div class="quote-item-spec">含開關插座36組</div></div><div class="quote-item-price">NT$95,000</div></div>
+    <div class="quote-row"><div><div class="quote-item-name">冷熱水管更換</div><div class="quote-item-spec">不鏽鋼管</div></div><div class="quote-item-price">NT$55,000</div></div>
+    <div class="quote-row"><div><div class="quote-item-name">排水管路</div><div class="quote-item-spec">含浴室地排2組</div></div><div class="quote-item-price">NT$30,000</div></div>
+  </div>
+
+  <div class="quote-section">
+    <div class="quote-section-header"><span>🧱 泥作工程</span><span>NT$320,000</span></div>
+    <div class="quote-row"><div><div class="quote-item-name">地磚鋪設</div><div class="quote-item-spec">60x60拋光磚 約32坪</div></div><div class="quote-item-price">NT$160,000</div></div>
+    <div class="quote-row"><div><div class="quote-item-name">浴室壁磚+地磚</div><div class="quote-item-spec">2間浴室</div></div><div class="quote-item-price">NT$95,000</div></div>
+    <div class="quote-row"><div><div class="quote-item-name">防水工程</div><div class="quote-item-spec">浴室+陽台</div></div><div class="quote-item-price">NT$65,000</div></div>
+  </div>
+
+  <div class="quote-section">
+    <div class="quote-section-header"><span>🪵 木作工程</span><span>NT$480,000</span></div>
+    <div class="quote-row"><div><div class="quote-item-name">客廳電視牆</div><div class="quote-item-spec">含燈帶、石材飾面</div></div><div class="quote-item-price">NT$120,000</div></div>
+    <div class="quote-row"><div><div class="quote-item-name">全室天花板</div><div class="quote-item-spec">含間接照明</div></div><div class="quote-item-price">NT$185,000</div></div>
+    <div class="quote-row"><div><div class="quote-item-name">主臥衣櫃</div><div class="quote-item-spec">8尺系統櫃</div></div><div class="quote-item-price">NT$95,000</div></div>
+    <div class="quote-row"><div><div class="quote-item-name">鞋櫃+玄關</div><div class="quote-item-spec">含穿鞋椅</div></div><div class="quote-item-price">NT$80,000</div></div>
+  </div>
+
+  <div class="quote-section">
+    <div class="quote-section-header"><span>🎨 油漆+其他</span><span>NT$195,000</span></div>
+    <div class="quote-row"><div><div class="quote-item-name">全室油漆</div><div class="quote-item-spec">得利乳膠漆 3底2面</div></div><div class="quote-item-price">NT$85,000</div></div>
+    <div class="quote-row"><div><div class="quote-item-name">鋁窗更換</div><div class="quote-item-spec">氣密窗4組</div></div><div class="quote-item-price">NT$72,000</div></div>
+    <div class="quote-row"><div><div class="quote-item-name">清潔工程</div><div class="quote-item-spec">粗清+細清</div></div><div class="quote-item-price">NT$18,000</div></div>
+    <div class="quote-row"><div><div class="quote-item-name">設計費</div><div class="quote-item-spec">32坪 × NT$3,000/坪</div></div><div class="quote-item-price">NT$96,000</div></div>
+  </div>
+
+  <div class="quote-section">
+    <div class="quote-section-header"><span>🪟 鋁窗工程</span><span>NT$120,000</span></div>
+    <div class="quote-row"><div><div class="quote-item-name">氣密鋁窗</div><div class="quote-item-spec">YKK 4組含安裝</div></div><div class="quote-item-price">NT$120,000</div></div>
+  </div>
+
+  <div class="quote-total">
+    <span>工程總價</span>
+    <span style="color:var(--accent)">NT$1,800,000</span>
+  </div>
+</div>
+
+<!-- ===== SCREEN 4: Payment Tracking ===== -->
+<div class="screen" id="screen-payments">
+  <div class="filter-tabs" data-filter-group="payments">
+    <button class="filter-tab active" data-filter="all">全部案件</button>
+    <button class="filter-tab" data-filter="overdue">逾期未付</button>
+    <button class="filter-tab" data-filter="upcoming">即將到期</button>
+  </div>
+
+  <div class="payment-card" data-pay="overdue">
+    <div class="payment-header">
+      <div class="payment-customer">林先生 — 信義路案</div>
+      <div class="payment-total">總價 NT$1,800,000</div>
+    </div>
+    <div class="milestone">
+      <div class="milestone-check check-paid">✓</div>
+      <div class="milestone-info"><div class="milestone-name">簽約訂金 30%</div><div class="milestone-date">2026/02/20 已付</div></div>
+      <div class="milestone-amount paid">NT$540,000</div>
+    </div>
+    <div class="milestone">
+      <div class="milestone-check check-due">!</div>
+      <div class="milestone-info"><div class="milestone-name">泥作完工 20%</div><div class="milestone-date" style="color:var(--danger)">預計 3/18 ・ 即將到期</div></div>
+      <div class="milestone-amount due">NT$360,000</div>
+    </div>
+    <div class="milestone">
+      <div class="milestone-check check-pending">-</div>
+      <div class="milestone-info"><div class="milestone-name">木作完工 20%</div><div class="milestone-date">預計 3/28</div></div>
+      <div class="milestone-amount">NT$360,000</div>
+    </div>
+    <div class="milestone">
+      <div class="milestone-check check-pending">-</div>
+      <div class="milestone-info"><div class="milestone-name">驗收尾款 30%</div><div class="milestone-date">預計 4/5</div></div>
+      <div class="milestone-amount">NT$540,000</div>
+    </div>
+    <div style="margin-top:10px; padding-top:10px; border-top:1px solid #f0f0f0; display:flex; justify-content:space-between; font-size:13px;">
+      <span>已收 <b style="color:var(--success)">NT$540,000</b></span>
+      <span>待收 <b style="color:var(--danger)">NT$1,260,000</b></span>
+    </div>
+  </div>
+
+  <div class="payment-card" data-pay="overdue">
+    <div class="payment-header">
+      <div class="payment-customer">張小姐 — 復興南路案</div>
+      <div class="payment-total">總價 NT$650,000</div>
+    </div>
+    <div class="milestone">
+      <div class="milestone-check check-paid">✓</div>
+      <div class="milestone-info"><div class="milestone-name">簽約訂金 30%</div><div class="milestone-date">2026/02/15 已付</div></div>
+      <div class="milestone-amount paid">NT$195,000</div>
+    </div>
+    <div class="milestone">
+      <div class="milestone-check check-paid">✓</div>
+      <div class="milestone-info"><div class="milestone-name">泥作完工 30%</div><div class="milestone-date">2026/03/06 已付</div></div>
+      <div class="milestone-amount paid">NT$195,000</div>
+    </div>
+    <div class="milestone">
+      <div class="milestone-check check-due">!</div>
+      <div class="milestone-info"><div class="milestone-name">廚具完工 20%</div><div class="milestone-date" style="color:var(--danger)">3/15 到期 ・ 尚未付款</div></div>
+      <div class="milestone-amount due">NT$130,000</div>
+    </div>
+    <div class="milestone">
+      <div class="milestone-check check-pending">-</div>
+      <div class="milestone-info"><div class="milestone-name">驗收尾款 20%</div><div class="milestone-date">預計 3/19</div></div>
+      <div class="milestone-amount">NT$130,000</div>
+    </div>
+  </div>
+
+  <div class="payment-card" data-pay="upcoming">
+    <div class="payment-header">
+      <div class="payment-customer">陳先生 — 民生東路案</div>
+      <div class="payment-total">總價 NT$2,200,000</div>
+    </div>
+    <div class="milestone">
+      <div class="milestone-check check-paid">✓</div>
+      <div class="milestone-info"><div class="milestone-name">設計訂金 10%</div><div class="milestone-date">2026/03/01 已付</div></div>
+      <div class="milestone-amount paid">NT$220,000</div>
+    </div>
+    <div class="milestone">
+      <div class="milestone-check check-due">!</div>
+      <div class="milestone-info"><div class="milestone-name">開工款 20%</div><div class="milestone-date" style="color:var(--warning)">預計 4/1 ・ 即將到期</div></div>
+      <div class="milestone-amount due">NT$440,000</div>
+    </div>
+    <div class="milestone">
+      <div class="milestone-check check-pending">-</div>
+      <div class="milestone-info"><div class="milestone-name">中期款 30%</div><div class="milestone-date">TBD</div></div>
+      <div class="milestone-amount">NT$660,000</div>
+    </div>
+    <div class="milestone">
+      <div class="milestone-check check-pending">-</div>
+      <div class="milestone-info"><div class="milestone-name">驗收尾款 40%</div><div class="milestone-date">TBD</div></div>
+      <div class="milestone-amount">NT$880,000</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCREEN 5: Schedule ===== -->
+<div class="screen" id="screen-schedule">
+  <div class="section" style="padding-bottom:0;">
+    <div class="section-title">📅 工班排程表</div>
+  </div>
+
+  <div class="schedule-day">今天 — 3/14（五）</div>
+  <div class="schedule-card">
+    <div class="schedule-time-block"><div class="schedule-time">08:00</div><div class="schedule-period">整天</div></div>
+    <div class="schedule-info">
+      <div class="schedule-project">🏠 林先生 信義路案</div>
+      <div class="schedule-trade">泥作貼磚 — 浴室地磚</div>
+      <div class="schedule-crew">👷 陳師傅 +1人</div>
+    </div>
+    <span class="schedule-alert alert-ok">正常</span>
+  </div>
+  <div class="schedule-card">
+    <div class="schedule-time-block"><div class="schedule-time">09:00</div><div class="schedule-period">整天</div></div>
+    <div class="schedule-info">
+      <div class="schedule-project">🏠 張小姐 復興南路案</div>
+      <div class="schedule-trade">廚具安裝 — 上下櫃</div>
+      <div class="schedule-crew">👷 永盛廚具團隊 3人</div>
+    </div>
+    <span class="schedule-alert alert-ok">正常</span>
+  </div>
+
+  <div class="schedule-day">3/17（一）</div>
+  <div class="schedule-card">
+    <div class="schedule-time-block"><div class="schedule-time">08:00</div><div class="schedule-period">整天</div></div>
+    <div class="schedule-info">
+      <div class="schedule-project">🏠 林先生 信義路案</div>
+      <div class="schedule-trade">泥作貼磚 — 最後一天</div>
+      <div class="schedule-crew">👷 陳師傅 +1人</div>
+    </div>
+    <span class="schedule-alert alert-ok">正常</span>
+  </div>
+  <div class="schedule-card">
+    <div class="schedule-time-block"><div class="schedule-time">09:00</div><div class="schedule-period">半天</div></div>
+    <div class="schedule-info">
+      <div class="schedule-project">🏠 張小姐 復興南路案</div>
+      <div class="schedule-trade">油漆 — 批土第一道</div>
+      <div class="schedule-crew">👷 阿明師 +1人</div>
+    </div>
+    <span class="schedule-alert alert-ok">正常</span>
+  </div>
+
+  <div class="schedule-day">3/20（四）</div>
+  <div class="schedule-card" style="border-left: 3px solid var(--danger);">
+    <div class="schedule-time-block"><div class="schedule-time">08:00</div><div class="schedule-period">整天</div></div>
+    <div class="schedule-info">
+      <div class="schedule-project">🏠 林先生 信義路案</div>
+      <div class="schedule-trade">木作 — 電視牆+天花板</div>
+      <div class="schedule-crew">👷 大胖木工 +2人</div>
+    </div>
+    <span class="schedule-alert alert-conflict">⚠ 衝突</span>
+  </div>
+  <div class="schedule-card" style="border-left: 3px solid var(--danger);">
+    <div class="schedule-time-block"><div class="schedule-time">08:00</div><div class="schedule-period">整天</div></div>
+    <div class="schedule-info">
+      <div class="schedule-project">🏠 陳先生 民生東路案</div>
+      <div class="schedule-trade">木作 — 丈量放樣</div>
+      <div class="schedule-crew">👷 大胖木工</div>
+    </div>
+    <span class="schedule-alert alert-conflict">⚠ 同師傅</span>
+  </div>
+
+  <div class="schedule-day">3/24（一）</div>
+  <div class="schedule-card">
+    <div class="schedule-time-block"><div class="schedule-time">08:00</div><div class="schedule-period">整天</div></div>
+    <div class="schedule-info">
+      <div class="schedule-project">🏠 林先生 信義路案</div>
+      <div class="schedule-trade">油漆 — 批土+底漆</div>
+      <div class="schedule-crew">👷 阿明師 +1人</div>
+    </div>
+    <span class="schedule-alert alert-ok">正常</span>
+  </div>
+</div>
+
+<!-- Bottom Navigation -->
+<nav class="bottom-nav">
+  <button class="nav-item active" onclick="switchScreen('line')">
+    <span class="nav-icon">💬</span>
+    <span class="nav-label">屋主LINE</span>
+  </button>
+  <button class="nav-item" onclick="switchScreen('projects')">
+    <span class="nav-icon">🏠</span>
+    <span class="nav-label">案件</span>
+    <span class="badge">4</span>
+  </button>
+  <button class="nav-item" onclick="switchScreen('quote')">
+    <span class="nav-icon">📋</span>
+    <span class="nav-label">報價單</span>
+  </button>
+  <button class="nav-item" onclick="switchScreen('payments')">
+    <span class="nav-icon">💰</span>
+    <span class="nav-label">收款</span>
+    <span class="badge" style="background:var(--warning)">2</span>
+  </button>
+  <button class="nav-item" onclick="switchScreen('schedule')">
+    <span class="nav-icon">📅</span>
+    <span class="nav-label">排程</span>
+    <span class="badge">!</span>
+  </button>
+</nav>
+
+<script>
+function switchScreen(name) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById('screen-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  if (event && event.currentTarget) event.currentTarget.classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+document.querySelectorAll('.filter-tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    this.parentElement.querySelectorAll('.filter-tab').forEach(function(t) { t.classList.remove('active'); });
+    this.classList.add('active');
+
+    var group = this.parentElement.getAttribute('data-filter-group');
+    var filter = this.getAttribute('data-filter');
+
+    if (group === 'projects') {
+      document.querySelectorAll('.project-card').forEach(function(card) {
+        if (filter === 'all' || card.getAttribute('data-status') === filter) {
+          card.style.display = 'block';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    if (group === 'payments') {
+      document.querySelectorAll('.payment-card').forEach(function(card) {
+        var tags = card.getAttribute('data-pay') || '';
+        if (filter === 'all' || tags.indexOf(filter) !== -1) {
+          card.style.display = 'block';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+  });
+});
+</script>
+
+</body>
+</html>

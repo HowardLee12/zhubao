@@ -21,16 +21,13 @@ export interface QuoteWithProject extends QuoteRow {
 export async function getProjects(): Promise<ProjectWithRelations[]> {
   const userId = await getUserId();
 
-  let query = supabase
+  if (!userId) return [];
+
+  const { data: projects, error } = await supabase
     .from("projects")
     .select("*")
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
-
-  if (userId) {
-    query = query.eq("user_id", userId);
-  }
-
-  const { data: projects, error } = await query;
 
   if (error) throw new Error(`Failed to fetch projects: ${error.message}`);
 
@@ -57,16 +54,14 @@ export async function getProjects(): Promise<ProjectWithRelations[]> {
 export async function getProject(id: string): Promise<ProjectWithRelations | null> {
   const userId = await getUserId();
 
-  let query = supabase
+  if (!userId) return null;
+
+  const { data, error } = await supabase
     .from("projects")
     .select("*")
-    .eq("id", id);
-
-  if (userId) {
-    query = query.eq("user_id", userId);
-  }
-
-  const { data, error } = await query.single();
+    .eq("id", id)
+    .eq("user_id", userId)
+    .single();
 
   if (error) return null;
   const project = data as ProjectRow;
@@ -137,12 +132,12 @@ export async function getQuotesByProject(projectId: string): Promise<QuoteRow[]>
 export async function getAllQuotesWithProjects(): Promise<QuoteWithProject[]> {
   const userId = await getUserId();
 
-  // First get user's projects, then their quotes
-  let projectQuery = supabase.from("projects").select("id");
-  if (userId) {
-    projectQuery = projectQuery.eq("user_id", userId);
-  }
-  const { data: userProjects } = await projectQuery;
+  if (!userId) return [];
+
+  const { data: userProjects } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("user_id", userId);
   const userProjectIds = ((userProjects ?? []) as { id: string }[]).map((p) => p.id);
 
   if (userProjectIds.length === 0) return [];

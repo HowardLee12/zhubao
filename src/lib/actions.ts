@@ -13,6 +13,7 @@ export async function createProject(data: {
   description: string;
 }): Promise<ProjectRow> {
   const userId = await getUserId();
+  if (!userId) throw new Error("請先登入");
 
   const { data: project, error } = await supabase
     .from("projects")
@@ -51,10 +52,14 @@ export async function updateProject(
   if (data.status !== undefined) updateData.status = data.status;
   if (data.progress !== undefined) updateData.progress = data.progress;
 
+  const userId = await getUserId();
+  if (!userId) throw new Error("請先登入");
+
   const { error } = await supabase
     .from("projects")
     .update(updateData)
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", userId);
 
   if (error) throw new Error(`Failed to update project: ${error.message}`);
 
@@ -63,10 +68,14 @@ export async function updateProject(
 }
 
 export async function deleteProject(id: string) {
+  const userId = await getUserId();
+  if (!userId) throw new Error("請先登入");
+
   const { error } = await supabase
     .from("projects")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", userId);
 
   if (error) throw new Error(`Failed to delete project: ${error.message}`);
   revalidatePath("/");

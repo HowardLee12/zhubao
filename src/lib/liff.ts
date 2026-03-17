@@ -6,16 +6,18 @@ let initialized = false;
 
 export async function initLiff(): Promise<void> {
   if (initialized) return;
-  if (!LIFF_ID) {
-    console.warn("LIFF ID not configured");
-    return;
-  }
+  if (!LIFF_ID) return;
   try {
     await liff.init({ liffId: LIFF_ID });
     initialized = true;
-  } catch (err) {
-    console.error("LIFF init failed:", err);
+  } catch {
+    // LIFF init failed — will fall back to non-auth state
   }
+}
+
+export function getIdToken(): string | null {
+  if (!initialized) return null;
+  return liff.getIDToken();
 }
 
 export function isInLiff(): boolean {

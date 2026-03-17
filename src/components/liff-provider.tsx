@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, createContext, useContext, useState, useCallback } from "react";
-import { initLiff, isLoggedIn, getProfile, isInLiff, login } from "@/lib/liff";
+import { initLiff, isLoggedIn, getProfile, getIdToken, isInLiff, login } from "@/lib/liff";
 
 interface UserInfo {
   id: string;
@@ -25,6 +25,13 @@ export function useLiff() {
   return useContext(LiffContext);
 }
 
+function hasCookie(name: string): boolean {
+  return document.cookie.split(";").some((c) => c.trim().startsWith(name + "="));
+}
+
+const RELOAD_KEY = "zhubao_auth_reload";
+const MAX_RELOADS = 3;
+
 export function LiffProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<LiffContextValue>({
     ready: false,
@@ -33,39 +40,36 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
   });
 
   const initialize = useCallback(async () => {
+    const alreadyLoggedIn = hasCookie("zhubao_logged_in");
+
     await initLiff();
 
-    // If in LIFF but not logged in, trigger login
+    // If in LIFF but not logged in, trigger LINE login
     if (isInLiff() && !isLoggedIn()) {
       login();
       return;
     }
 
-    // If logged in, get profile and register/login with our backend
-    if (isLoggedIn()) {
-      const profile = await getProfile();
-      if (profile) {
+    // If LIFF logged in but no server cookie, authenticate with backend
+    if (isLoggedIn() && !alreadyLoggedIn) {
+      const idToken = getIdToken();
+      if (idToken) {
         try {
           const res = await fetch("/api/auth", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              lineUserId: profile.userId,
-              displayName: profile.displayName,
-              pictureUrl: profile.pictureUrl ?? "",
-            }),
+            body: JSON.stringify({ idToken }),
           });
           if (res.ok) {
-            const data = await res.json();
-            setState({
-              ready: true,
-              user: {
-                id: data.id,
-                displayName: data.displayName,
-                pictureUrl: data.pictureUrl,
-              },
-              loading: false,
-            });
+            // Reload so server components pick up the cookie
+            const reloadCount = parseInt(sessionStorage.getItem(RELOAD_KEY) ?? "0", 10);
+            if (reloadCount < MAX_RELOADS) {
+              sessionStorage.setItem(RELOAD_KEY, String(reloadCount + 1));
+              globalThis.location.reload();
+              return;
+            }
+            // Max reloads reached — show error
+            setState({ ready: true, user: null, loading: false });
             return;
           }
         } catch {
@@ -74,7 +78,28 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Not in LIFF or not logged in — still allow access (browser mode)
+    // If already authenticated, get profile for display
+    if (isLoggedIn() && alreadyLoggedIn) {
+      // Clear reload counter on successful load
+      sessionStorage.removeItem(RELOAD_KEY);
+
+      const profile = await getProfile();
+      if (profile) {
+        setState({
+          ready: true,
+          user: {
+            id: "",  // ID comes from server, not needed client-side
+            displayName: profile.displayName,
+            pictureUrl: profile.pictureUrl,
+          },
+          loading: false,
+        });
+        return;
+      }
+    }
+
+    // Not in LIFF or not logged in
+    sessionStorage.removeItem(RELOAD_KEY);
     setState({ ready: true, user: null, loading: false });
   }, []);
 

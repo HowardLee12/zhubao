@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Social Image</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  background: #F5F5F5;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.container {
+  width: 1200px;
+  background: white;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+/* Top bar */
+.top-bar {
+  background: linear-gradient(135deg, #E67E22, #D35400);
+  color: white;
+  text-align: center;
+  padding: 24px 40px;
+}
+.top-title {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+.top-subtitle {
+  font-size: 18px;
+  opacity: 0.9;
+}
+
+/* Comparison */
+.compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.side {
+  padding: 32px 40px;
+}
+
+.side-left {
+  background: #FEF0E7;
+  border-right: 3px dashed #E67E22;
+}
+.side-right {
+  background: #EBF5FB;
+}
+
+.side-label {
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.side-left .side-label { color: #E74C3C; }
+.side-right .side-label { color: #27AE60; }
+
+/* Pain items */
+.pain-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+}
+.side-left .pain-item { background: rgba(231,76,60,0.08); }
+.side-right .pain-item { background: rgba(39,174,96,0.08); }
+
+.pain-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+  width: 40px;
+  text-align: center;
+}
+.pain-text {
+  font-size: 16px;
+  line-height: 1.5;
+}
+.pain-title {
+  font-weight: 700;
+  font-size: 17px;
+  margin-bottom: 2px;
+}
+.side-left .pain-title { color: #C0392B; }
+.side-right .pain-title { color: #1E8449; }
+.pain-desc {
+  color: #666;
+  font-size: 14px;
+}
+
+/* VS circle */
+.compare { position: relative; }
+.vs-circle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  background: var(--accent, #E67E22);
+  border: 4px solid white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+  font-weight: 800;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  z-index: 10;
+}
+
+/* Bottom CTA */
+.bottom-bar {
+  background: #2C3E50;
+  color: white;
+  text-align: center;
+  padding: 20px 40px;
+  font-size: 18px;
+}
+.bottom-bar b { color: #F39C12; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="top-bar">
+    <div class="top-title">裝潢工程管理，你還在用 LINE 群組 + Excel？</div>
+    <div class="top-subtitle">同時跑 3 個案場的你，是不是每天都在找訊息、追款項、喬排程？</div>
+  </div>
+
+  <div class="compare">
+    <div class="vs-circle">VS</div>
+
+    <div class="side side-left">
+      <div class="side-label">❌ 現在的你</div>
+
+      <div class="pain-item">
+        <div class="pain-icon">📱</div>
+        <div class="pain-text">
+          <div class="pain-title">LINE 群組炸裂</div>
+          <div class="pain-desc">10 個群組翻不完，昨天泥作師傅說的那句話找不到</div>
+        </div>
+      </div>
+
+      <div class="pain-item">
+        <div class="pain-icon">📝</div>
+        <div class="pain-text">
+          <div class="pain-title">報價單改到第 N 版</div>
+          <div class="pain-desc">Excel 寄來寄去，屋主說「你上次報的不是這個價」</div>
+        </div>
+      </div>
+
+      <div class="pain-item">
+        <div class="pain-icon">💸</div>
+        <div class="pain-text">
+          <div class="pain-title">分階段收款用腦記</div>
+          <div class="pain-desc">泥作做完了，屋主那期款還沒付，不好意思催</div>
+        </div>
+      </div>
+
+      <div class="pain-item">
+        <div class="pain-icon">🔧</div>
+        <div class="pain-text">
+          <div class="pain-title">工班排到撞車</div>
+          <div class="pain-desc">木工師傅同一天排兩個工地，到現場才發現</div>
+        </div>
+      </div>
+
+      <div class="pain-item">
+        <div class="pain-icon">📸</div>
+        <div class="pain-text">
+          <div class="pain-title">施工照片散落各處</div>
+          <div class="pain-desc">驗收時要翻 3 支手機 + 5 個群組才找到水管走線照片</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side side-right">
+      <div class="side-label">✅ 如果有一個系統</div>
+
+      <div class="pain-item">
+        <div class="pain-icon">📊</div>
+        <div class="pain-text">
+          <div class="pain-title">所有案件一頁看完</div>
+          <div class="pain-desc">每個案場進度、目前哪個工種在做、完成度幾 %</div>
+        </div>
+      </div>
+
+      <div class="pain-item">
+        <div class="pain-icon">📋</div>
+        <div class="pain-text">
+          <div class="pain-title">報價單線上管理</div>
+          <div class="pain-desc">逐項列出、自動算總價，屋主 LINE 裡直接看，永遠最新版</div>
+        </div>
+      </div>
+
+      <div class="pain-item">
+        <div class="pain-icon">💰</div>
+        <div class="pain-text">
+          <div class="pain-title">分階段收款自動提醒</div>
+          <div class="pain-desc">泥作完工 → 系統自動通知屋主：「第二期款 NT$36 萬到期」</div>
+        </div>
+      </div>
+
+      <div class="pain-item">
+        <div class="pain-icon">📅</div>
+        <div class="pain-text">
+          <div class="pain-title">排程衝突自動偵測</div>
+          <div class="pain-desc">同一師傅排到兩個案場？系統馬上標紅提醒</div>
+        </div>
+      </div>
+
+      <div class="pain-item">
+        <div class="pain-icon">📸</div>
+        <div class="pain-text">
+          <div class="pain-title">施工照片自動歸檔</div>
+          <div class="pain-desc">按案場 + 工種 + 日期分類，驗收時一秒找到</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-bar">
+    👷 正在調查裝潢產業需求，想聽聽 <b>設計師 / 統包 / 師傅</b> 的真實心聲 — 歡迎留言或私訊 🙏
+  </div>
+</div>
+
+</body>
+</html>

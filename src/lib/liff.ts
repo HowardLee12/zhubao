@@ -20,6 +20,11 @@ export function getIdToken(): string | null {
   return liff.getIDToken();
 }
 
+export function getAccessToken(): string | null {
+  if (!initialized) return null;
+  return liff.getAccessToken();
+}
+
 export function isInLiff(): boolean {
   return initialized && liff.isInClient();
 }

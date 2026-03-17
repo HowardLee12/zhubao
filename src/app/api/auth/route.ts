@@ -7,40 +7,40 @@ const AUTH_SECRET = new TextEncoder().encode(
   process.env.AUTH_SECRET ?? "zhubao-dev-secret-change-in-production"
 );
 
-const LINE_CHANNEL_ID = process.env.NEXT_PUBLIC_LIFF_ID?.split("-")[0] ?? "";
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { idToken } = body as { idToken: string };
+    const { accessToken } = body as { accessToken: string };
 
-    if (!idToken) {
-      return NextResponse.json({ error: "Missing ID token" }, { status: 400 });
+    if (!accessToken) {
+      return NextResponse.json({ error: "Missing access token" }, { status: 400 });
     }
 
-    // Verify LINE ID token server-side
-    const verifyRes = await fetch("https://api.line.me/oauth2/v2.1/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        id_token: idToken,
-        client_id: LINE_CHANNEL_ID,
-      }),
-    });
-
+    // Verify access token with LINE
+    const verifyRes = await fetch(
+      `https://api.line.me/oauth2/v2.1/verify?access_token=${encodeURIComponent(accessToken)}`
+    );
     if (!verifyRes.ok) {
-      return NextResponse.json({ error: "Invalid LINE token" }, { status: 401 });
+      return NextResponse.json({ error: "Invalid access token" }, { status: 401 });
     }
 
-    const lineProfile = await verifyRes.json() as {
-      sub: string;
-      name: string;
-      picture?: string;
+    // Get user profile from LINE
+    const profileRes = await fetch("https://api.line.me/v2/profile", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!profileRes.ok) {
+      return NextResponse.json({ error: "Failed to get LINE profile" }, { status: 401 });
+    }
+
+    const profile = await profileRes.json() as {
+      userId: string;
+      displayName: string;
+      pictureUrl?: string;
     };
 
-    const lineUserId = lineProfile.sub;
-    const displayName = lineProfile.name;
-    const pictureUrl = lineProfile.picture ?? "";
+    const lineUserId = profile.userId;
+    const displayName = profile.displayName;
+    const pictureUrl = profile.pictureUrl ?? "";
 
     // Find or create user
     const { data: existing } = await supabase
@@ -92,20 +92,18 @@ export async function POST(request: NextRequest) {
       pictureUrl: user.picture_url,
     });
 
-    // Signed httpOnly cookie
     response.cookies.set("zhubao_session", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
+      sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
+      maxAge: 60 * 60 * 24 * 30,
     });
 
-    // Client-side flag cookie (no sensitive data)
     response.cookies.set("zhubao_logged_in", "1", {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
+      sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
     });

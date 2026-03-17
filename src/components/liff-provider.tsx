@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, createContext, useContext, useState, useCallback } from "react";
-import { initLiff, isLoggedIn, getProfile, getIdToken, isInLiff, login } from "@/lib/liff";
+import { initLiff, isLoggedIn, getProfile, getAccessToken, isInLiff, login } from "@/lib/liff";
 
 interface UserInfo {
   id: string;
@@ -52,13 +52,13 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
 
     // If LIFF logged in but no server cookie, authenticate with backend
     if (isLoggedIn() && !alreadyLoggedIn) {
-      const idToken = getIdToken();
-      if (idToken) {
+      const accessToken = getAccessToken();
+      if (accessToken) {
         try {
           const res = await fetch("/api/auth", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken }),
+            body: JSON.stringify({ accessToken }),
           });
           if (res.ok) {
             // Reload so server components pick up the cookie

@@ -212,7 +212,7 @@ export function InlineQuoteBuilder({
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      await createQuoteWithSections({
+      const result = await createQuoteWithSections({
         projectId,
         sections: validSections.map((s) => ({
           name: s.name,
@@ -229,11 +229,16 @@ export function InlineQuoteBuilder({
             })),
         })),
       });
+      if (result.error) {
+        setIsSubmitting(false);
+        setSubmitError(result.error);
+        return;
+      }
       onClose();
       router.refresh();
-    } catch (err) {
+    } catch {
       setIsSubmitting(false);
-      setSubmitError(err instanceof Error ? err.message : "儲存失敗，請重試");
+      setSubmitError("儲存失敗，請稍後再試");
     }
   };
 

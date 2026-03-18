@@ -37,11 +37,14 @@ export default function NewProjectPage() {
 
   return (
     <div>
-      <header className="bg-primary text-primary-foreground px-4 py-3">
-        <button onClick={() => router.back()} className="text-xs opacity-80">
-          ← 返回
+      <header className="bg-primary text-primary-foreground px-4 py-4">
+        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm py-1 opacity-80">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          返回
         </button>
-        <div className="text-lg font-bold mt-1">新增案件</div>
+        <div className="text-xl font-bold mt-2">新增案件</div>
       </header>
 
       <form onSubmit={handleSubmit} className="p-4 space-y-4">

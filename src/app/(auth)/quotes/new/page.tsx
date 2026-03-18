@@ -199,8 +199,9 @@ function NewQuoteContent() {
     if (validSections.length === 0) return;
 
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
-      const quote = await createQuoteWithSections({
+      const result = await createQuoteWithSections({
         projectId,
         sections: validSections.map((s) => ({
           name: s.name,
@@ -217,20 +218,28 @@ function NewQuoteContent() {
             })),
         })),
       });
-      router.push(`/quotes/${quote.id}`);
-    } catch (err) {
+      if (result.error) {
+        setIsSubmitting(false);
+        setSubmitError(result.error);
+        return;
+      }
+      router.push(`/quotes/${result.data!.id}`);
+    } catch {
       setIsSubmitting(false);
-      setSubmitError(err instanceof Error ? err.message : "儲存失敗，請重試");
+      setSubmitError("儲存失敗，請稍後再試");
     }
   };
 
   return (
     <div>
-      <header className="bg-primary text-primary-foreground px-4 py-3">
-        <button onClick={() => router.back()} className="text-xs opacity-80">
-          {"← 返回"}
+      <header className="bg-primary text-primary-foreground px-4 py-4">
+        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm py-1 opacity-80">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          返回
         </button>
-        <div className="text-lg font-bold mt-1">
+        <div className="text-xl font-bold mt-2">
           {cloneFrom ? "建立新版本報價" : "建立報價單"}
         </div>
       </header>

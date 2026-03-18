@@ -111,11 +111,11 @@ export async function createQuoteWithSections(data: {
       markupPercent: number;
     }[];
   }[];
-}): Promise<QuoteRow> {
+}): Promise<{ data?: QuoteRow; error?: string }> {
   // Check quota for free users
   const allowed = await canCreateQuote();
   if (!allowed) {
-    throw new Error("免費方案最多建立 1 張報價單，請升級為專業版");
+    return { error: "免費方案最多建立 1 張報價單，請升級為專業版" };
   }
 
   // Get next version number
@@ -139,7 +139,7 @@ export async function createQuoteWithSections(data: {
     .select()
     .single();
 
-  if (quoteError) throw new Error(`Failed to create quote: ${quoteError.message}`);
+  if (quoteError) return { error: `建立報價單失敗: ${quoteError.message}` };
 
   // Create sections and items
   for (let si = 0; si < data.sections.length; si++) {
@@ -155,7 +155,7 @@ export async function createQuoteWithSections(data: {
       .select()
       .single();
 
-    if (sectionError) throw new Error(`Failed to create section: ${sectionError.message}`);
+    if (sectionError) return { error: `建立分類失敗: ${sectionError.message}` };
 
     if (section.items.length > 0) {
       const itemRows = section.items.map((item, ii) => ({
@@ -173,7 +173,7 @@ export async function createQuoteWithSections(data: {
         .from("quote_items")
         .insert(itemRows);
 
-      if (itemsError) throw new Error(`Failed to create items: ${itemsError.message}`);
+      if (itemsError) return { error: `建立項目失敗: ${itemsError.message}` };
     }
   }
 
@@ -182,7 +182,7 @@ export async function createQuoteWithSections(data: {
 
   revalidatePath("/quotes");
   revalidatePath(`/quotes/${quote.id}`);
-  return quote;
+  return { data: quote };
 }
 
 export async function addQuoteItem(data: {

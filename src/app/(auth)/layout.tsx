@@ -3,6 +3,7 @@
 import { LiffProvider } from "@/components/liff-provider";
 import { AuthGuard } from "@/components/auth-guard";
 import { BottomNav } from "@/components/bottom-nav";
+import { FeedbackButton } from "@/components/feedback-button";
 
 export default function AuthLayout({
   children,
@@ -16,6 +17,7 @@ export default function AuthLayout({
           {children}
         </main>
         <BottomNav />
+        <FeedbackButton />
       </AuthGuard>
     </LiffProvider>
   );

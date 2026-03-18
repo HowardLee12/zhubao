@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useLiff } from "@/components/liff-provider";
 
 const FEEDBACK_URL = process.env.NEXT_PUBLIC_FEEDBACK_SHEET_URL ?? "";
 const MAX_LENGTH = 1000;
@@ -20,6 +21,7 @@ export function FeedbackButton() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(false);
+  const { user } = useLiff();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const autoCloseRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -87,6 +89,8 @@ export function FeedbackButton() {
         mode: "no-cors",
         headers: { "Content-Type": "text/plain" },
         body: JSON.stringify({
+          userId: user?.id ?? "",
+          userName: user?.displayName ?? "",
           type,
           message: trimmed.slice(0, MAX_LENGTH),
           page: globalThis.location?.pathname ?? "",

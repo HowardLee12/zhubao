@@ -1,0 +1,11 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#5C6B55"/>
+  <rect x="60" y="60" width="1080" height="510" rx="24" fill="#4A5944" opacity="0.5"/>
+  <text x="120" y="200" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="bold" fill="white">築報工程管理</text>
+  <text x="120" y="280" font-family="system-ui, -apple-system, sans-serif" font-size="32" fill="white" opacity="0.85">裝潢設計師的最佳工具</text>
+  <text x="120" y="370" font-family="system-ui, -apple-system, sans-serif" font-size="26" fill="white" opacity="0.7">報價單 · 工班排程 · 收款追蹤 · 施工照片</text>
+  <text x="120" y="420" font-family="system-ui, -apple-system, sans-serif" font-size="26" fill="white" opacity="0.7">雙版本報價：成本版 + 報客版，自動計算利潤</text>
+  <rect x="120" y="470" width="180" height="48" rx="24" fill="white" opacity="0.15"/>
+  <text x="155" y="502" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="white">免費試用</text>
+  <text x="960" y="530" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="white" opacity="0.5">zhubao.vercel.app</text>
+</svg>

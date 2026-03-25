@@ -48,7 +48,7 @@ export default async function QuotesListPage() {
           <div className="text-center py-12 text-muted-foreground">
             <div className="text-4xl mb-3">📋</div>
             <div className="text-sm">還沒有報價單</div>
-            <Link href="/" className="text-xs mt-1 text-primary font-medium block">
+            <Link href="/dashboard" className="text-xs mt-1 text-primary font-medium block">
               前往案件列表建立報價單
             </Link>
           </div>

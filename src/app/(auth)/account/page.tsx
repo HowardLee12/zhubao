@@ -16,7 +16,7 @@ export default async function AccountPage() {
     getUserUsage(),
   ]);
 
-  if (!profile) redirect("/");
+  if (!profile) redirect("/dashboard");
 
   const plan = profile.plan ?? "free";
   const quoteLimit = PLAN_LIMITS[plan]?.quotes ?? PLAN_LIMITS.free.quotes;

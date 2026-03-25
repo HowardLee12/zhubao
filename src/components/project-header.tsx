@@ -28,7 +28,7 @@ export function ProjectHeader({
     setDeleting(true);
     try {
       await deleteProject(project.id);
-      router.push("/");
+      router.push("/dashboard");
     } catch {
       setDeleting(false);
       globalThis.alert("刪除失敗，請重試");
@@ -40,7 +40,7 @@ export function ProjectHeader({
       <header className="bg-primary text-primary-foreground px-4 py-4">
         <div className="flex justify-between items-center mb-3">
           <Link
-            href="/"
+            href="/dashboard"
             className="flex items-center gap-1.5 text-sm py-1 opacity-80 hover:opacity-100 transition-opacity"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

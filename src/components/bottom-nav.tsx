@@ -53,7 +53,7 @@ function IconUser({ className }: { className?: string }) {
 }
 
 const navItems = [
-  { href: "/", icon: IconHome, label: "案件" },
+  { href: "/dashboard", icon: IconHome, label: "案件" },
   { href: "/schedule", icon: IconCalendar, label: "排程" },
   { href: "/payments", icon: IconDollarSign, label: "收款" },
   { href: "/account", icon: IconUser, label: "帳號" },
@@ -66,7 +66,7 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-border flex z-50">
       {navItems.map((item) => {
         const isActive = pathname === item.href ||
-          (item.href !== "/" && pathname.startsWith(item.href));
+          (item.href !== "/dashboard" && pathname.startsWith(item.href));
         const Icon = item.icon;
 
         return (

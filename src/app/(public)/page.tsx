@@ -185,7 +185,9 @@ export default function LandingPage() {
             </div>
             <div className="flex justify-between items-center mb-3 mt-1">
               <span className="text-base font-bold text-sage-800">專業版</span>
-              <span className="text-sm text-sage-500">定價規劃中</span>
+              <span className="text-lg font-extrabold text-sage-800">
+                NT$599<span className="text-xs font-normal text-sage-500">/月</span>
+              </span>
             </div>
             <ul className="space-y-2 text-sm text-sage-600">
               <li className="flex items-center gap-2">
@@ -226,12 +228,14 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="px-5 py-6 text-center text-xs text-sage-400">
-        <p>築報工程管理</p>
-        <p className="mt-1">
+      <footer className="px-5 py-8 text-center text-xs text-sage-500 border-t border-sage-200">
+        <p className="font-semibold text-sage-700 mb-2">築報工程管理</p>
+        <p>聯絡電話：0978-156237</p>
+        <p>Email：wei00925@gmail.com</p>
+        <p className="mt-3">
           <Link href="/dashboard" className="underline">登入</Link>
           {" "}·{" "}
-          <a href={`mailto:wei00925@gmail.com`} className="underline">聯絡我們</a>
+          <a href="mailto:wei00925@gmail.com" className="underline">聯絡我們</a>
         </p>
       </footer>
     </div>

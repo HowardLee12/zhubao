@@ -24,6 +24,21 @@ export function formatDateLong(date: Date = new Date()): string {
   return `${date.getMonth() + 1}月${date.getDate()}日 週${WEEKDAYS_ZH[date.getDay()]}`;
 }
 
+// "2026-05-13" -> "今天 · 5/13 週三", "2026-05-14" -> "明天 · 5/14 週四",
+// otherwise "5/13 週三"
+export function formatScheduleDate(dateStr: string, today: string): string {
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return dateStr;
+  const md = `${date.getMonth() + 1}/${date.getDate()} 週${WEEKDAYS_ZH[date.getDay()]}`;
+
+  const todayDate = new Date(today);
+  const tomorrowStr = new Date(todayDate.getTime() + 86400000).toISOString().slice(0, 10);
+
+  if (dateStr === today) return `今天 · ${md}`;
+  if (dateStr === tomorrowStr) return `明天 · ${md}`;
+  return md;
+}
+
 export function greeting(date: Date = new Date()): string {
   const h = date.getHours();
   if (h < 5) return "深夜辛苦了";

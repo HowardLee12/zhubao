@@ -17,12 +17,12 @@ export function ProjectQuotesSection({
   const [showBuilder, setShowBuilder] = useState(false);
   const [cloneFromId, setCloneFromId] = useState<string | undefined>(undefined);
 
-  const handleNewQuote = () => {
+  const openNew = () => {
     setCloneFromId(undefined);
     setShowBuilder(true);
   };
 
-  const handleCloneQuote = (quoteId: string) => {
+  const openClone = (quoteId: string) => {
     setCloneFromId(quoteId);
     setShowBuilder(true);
   };
@@ -39,34 +39,34 @@ export function ProjectQuotesSection({
 
   return (
     <>
-      <div className="flex justify-between items-center mb-3">
-        <div className="text-sm font-semibold text-sage-800">報價單</div>
+      <div className="flex justify-between items-center mb-2">
+        <div className="text-[13px] font-semibold text-ink-2 tracking-wider">
+          報價單
+        </div>
         {canCreate && (
           <button
-            onClick={handleNewQuote}
-            className="text-xs text-primary font-medium"
+            type="button"
+            onClick={openNew}
+            className="text-xs text-orange font-semibold"
           >
             + 建立報價
           </button>
         )}
       </div>
 
-      {!canCreate && quotes.length === 0 && (
-        <div className="text-center py-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
-          免費方案最多 1 張報價單，請至帳號頁升級
-        </div>
-      )}
-
-      {!canCreate && quotes.length > 0 && (
-        <div className="mb-2 text-center py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
-          已達免費方案上限，升級後可建立更多報價
+      {!canCreate && (
+        <div className="mb-2 px-3 py-2 bg-amber-soft border border-amber/40 rounded-xl text-xs text-amber">
+          {quotes.length === 0
+            ? "報價單已達免費方案上限，請至帳號頁升級"
+            : "已達免費方案上限，升級後可建立更多報價"}
         </div>
       )}
 
       {canCreate && quotes.length === 0 && (
         <button
-          onClick={handleNewQuote}
-          className="block w-full text-center py-3 border-2 border-dashed border-sage-300 rounded-xl text-sm text-sage-500 font-medium"
+          type="button"
+          onClick={openNew}
+          className="block w-full text-center py-3 border-2 border-dashed border-warm-border-strong rounded-xl text-sm text-ink-2 font-medium bg-surface-warm"
         >
           + 建立第一份報價單
         </button>
@@ -79,21 +79,23 @@ export function ProjectQuotesSection({
               <Link
                 key={q.id}
                 href={`/quotes/${q.id}`}
-                className="shrink-0 bg-card rounded-xl shadow-sm px-4 py-2.5 active:scale-[0.98] transition-transform"
+                className="shrink-0 bg-surface border border-warm-border rounded-xl px-3.5 py-2.5 active:scale-[0.98] transition-transform"
               >
-                <div className="text-xs font-semibold text-sage-700">v{q.version}</div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">
+                <div className="text-xs font-bold text-orange font-mono">
+                  v{q.version}
+                </div>
+                <div className="text-[10px] text-ink-3 mt-0.5 font-mono">
                   {new Date(q.created_at).toLocaleDateString("zh-TW")}
                 </div>
               </Link>
             ))}
           </div>
 
-          {/* Clone from latest version */}
           {canCreate && (
             <button
-              onClick={() => handleCloneQuote(quotes[0].id)}
-              className="w-full py-2 text-xs text-primary font-medium border border-dashed border-sage-300 rounded-xl"
+              type="button"
+              onClick={() => openClone(quotes[0].id)}
+              className="w-full py-2 text-xs text-orange font-semibold border-2 border-dashed border-warm-border-strong rounded-xl bg-surface-warm"
             >
               + 以 v{quotes[0].version} 建立新版本
             </button>

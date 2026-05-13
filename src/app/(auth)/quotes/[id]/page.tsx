@@ -319,6 +319,15 @@ export default function QuoteDetailPage() {
         onShare={handleShare}
         sharing={sharing}
       />
+
+      <div className="px-4 mt-2">
+        <Link
+          href={`/quotes/${quote.id}/line-preview`}
+          className="block w-full text-center py-2.5 rounded-xl bg-surface border border-warm-border text-[13px] font-semibold text-ink-2 active:scale-[0.99] transition-transform"
+        >
+          👀 預覽屋主在 LINE 看到的樣子
+        </Link>
+      </div>
     </div>
   );
 }

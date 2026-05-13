@@ -28,11 +28,22 @@ export type TradeRow = {
   project_id: string;
   name: string;
   crew: string;
+  crew_id: string | null;
   start_date: string | null;
   end_date: string | null;
   status: "done" | "active" | "pending";
   sort_order: number;
   created_at: string;
+};
+
+export type CrewRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  role: string;
+  phone: string;
+  created_at: string;
+  updated_at: string;
 };
 
 export type PaymentRow = {
@@ -121,6 +132,11 @@ export interface Database {
         Row: QuoteItemRow;
         Insert: Partial<QuoteItemRow> & Pick<QuoteItemRow, "section_id" | "name">;
         Update: Partial<QuoteItemRow>;
+      };
+      crews: {
+        Row: CrewRow;
+        Insert: Partial<CrewRow> & Pick<CrewRow, "user_id" | "name">;
+        Update: Partial<CrewRow>;
       };
     };
   };

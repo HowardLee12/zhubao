@@ -30,7 +30,7 @@ export function LogoutButton() {
     <button
       onClick={handleLogout}
       disabled={loading}
-      className="w-full text-center py-3 text-sm text-destructive font-medium disabled:opacity-50"
+      className="w-full text-center py-3 rounded-2xl border border-warm-border bg-surface text-sm text-[var(--warm-red)] font-medium disabled:opacity-50"
     >
       {loading ? "登出中..." : "登出"}
     </button>

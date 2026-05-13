@@ -337,14 +337,16 @@ export async function updateTrade(
   data: {
     status?: "pending" | "active" | "done";
     crew?: string;
-    startDate?: string;
-    endDate?: string;
+    crewId?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
     projectId?: string;
   }
 ) {
   const updateData: Record<string, unknown> = {};
   if (data.status !== undefined) updateData.status = data.status;
   if (data.crew !== undefined) updateData.crew = data.crew;
+  if (data.crewId !== undefined) updateData.crew_id = data.crewId;
   if (data.startDate !== undefined) updateData.start_date = data.startDate;
   if (data.endDate !== undefined) updateData.end_date = data.endDate;
 
@@ -375,6 +377,7 @@ export async function addTrade(data: {
   projectId: string;
   name: string;
   crew: string;
+  crewId?: string | null;
   startDate?: string;
   endDate?: string;
 }) {
@@ -393,6 +396,7 @@ export async function addTrade(data: {
       project_id: data.projectId,
       name: data.name,
       crew: data.crew,
+      crew_id: data.crewId ?? null,
       start_date: data.startDate ?? null,
       end_date: data.endDate ?? null,
       status: "pending",
@@ -402,6 +406,99 @@ export async function addTrade(data: {
   if (error) throw new Error(`Failed to add trade: ${error.message}`);
   revalidatePath(`/projects/${data.projectId}`);
   revalidatePath("/schedule");
+}
+
+// ===== Crews =====
+
+export async function createCrew(data: {
+  name: string;
+  role: string;
+  phone: string;
+}) {
+  const userId = await getUserId();
+  if (!userId) throw new Error("請先登入");
+
+  const trimmed = {
+    name: data.name.trim(),
+    role: data.role.trim(),
+    phone: data.phone.trim(),
+  };
+  if (!trimmed.name) throw new Error("工班名稱不能空白");
+
+  const { data: crew, error } = await supabase
+    .from("crews")
+    .insert({
+      user_id: userId,
+      name: trimmed.name,
+      role: trimmed.role,
+      phone: trimmed.phone,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`新增工班失敗: ${error.message}`);
+
+  revalidatePath("/account/crews");
+  revalidatePath("/schedule");
+  return crew;
+}
+
+export async function updateCrew(
+  crewId: string,
+  data: { name?: string; role?: string; phone?: string }
+) {
+  const userId = await getUserId();
+  if (!userId) throw new Error("請先登入");
+
+  const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (data.name !== undefined) updateData.name = data.name.trim();
+  if (data.role !== undefined) updateData.role = data.role.trim();
+  if (data.phone !== undefined) updateData.phone = data.phone.trim();
+
+  const { error } = await supabase
+    .from("crews")
+    .update(updateData)
+    .eq("id", crewId)
+    .eq("user_id", userId);
+
+  if (error) throw new Error(`更新工班失敗: ${error.message}`);
+  revalidatePath("/account/crews");
+  revalidatePath("/schedule");
+}
+
+export async function deleteCrew(crewId: string) {
+  const userId = await getUserId();
+  if (!userId) throw new Error("請先登入");
+
+  const { error } = await supabase
+    .from("crews")
+    .delete()
+    .eq("id", crewId)
+    .eq("user_id", userId);
+
+  if (error) throw new Error(`刪除工班失敗: ${error.message}`);
+  revalidatePath("/account/crews");
+  revalidatePath("/schedule");
+}
+
+// Move trade to (crew, date). Used by drag-drop grid.
+export async function moveTrade(
+  tradeId: string,
+  target: { crewId: string | null; startDate: string; projectId?: string }
+) {
+  const updateData: Record<string, unknown> = {
+    crew_id: target.crewId,
+    start_date: target.startDate,
+  };
+
+  const { error } = await supabase
+    .from("trades")
+    .update(updateData)
+    .eq("id", tradeId);
+
+  if (error) throw new Error(`Failed to move trade: ${error.message}`);
+  revalidatePath("/schedule");
+  if (target.projectId) revalidatePath(`/projects/${target.projectId}`);
 }
 
 // ===== Photos =====

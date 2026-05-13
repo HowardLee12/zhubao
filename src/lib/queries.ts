@@ -3,7 +3,7 @@ import { getUserId } from "./auth";
 import {
   ProjectRow, TradeRow, PaymentRow,
   QuoteRow, QuoteSectionRow, QuoteItemRow,
-  UserRow, PhotoRow,
+  UserRow, PhotoRow, CrewRow,
 } from "./database.types";
 
 export const PLAN_LIMITS = {
@@ -283,4 +283,35 @@ export async function canUploadPhoto(projectId: string): Promise<{ allowed: bool
 
 export function getPhotoPublicUrl(path: string): string {
   return supabase.storage.from("photos").getPublicUrl(path).data.publicUrl;
+}
+
+// ===== Crews =====
+
+export async function getCrews(): Promise<CrewRow[]> {
+  const userId = await getUserId();
+  if (!userId) return [];
+
+  const { data, error } = await supabase
+    .from("crews")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+
+  if (error) return [];
+  return (data ?? []) as CrewRow[];
+}
+
+export async function getCrew(id: string): Promise<CrewRow | null> {
+  const userId = await getUserId();
+  if (!userId) return null;
+
+  const { data, error } = await supabase
+    .from("crews")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .single();
+
+  if (error) return null;
+  return data as CrewRow;
 }

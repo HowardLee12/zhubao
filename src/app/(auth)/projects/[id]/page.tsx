@@ -1,4 +1,4 @@
-import { getProject, getQuotesByProject, canCreateQuote, getPhotosByProject, canUploadPhoto, getPhotoPublicUrl } from "@/lib/queries";
+import { getProject, getQuotesByProject, canCreateQuote, getPhotosByProject, canUploadPhoto, getPhotoPublicUrl, getCrews } from "@/lib/queries";
 import { notFound } from "next/navigation";
 import { AddTradeForm } from "@/components/add-trade-form";
 import { AddPaymentForm } from "@/components/add-payment-form";
@@ -12,14 +12,15 @@ import { PhotoUpload } from "@/components/photo-upload";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectDetailPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
-  const [project, quotes, canCreate, photos, photoQuota] = await Promise.all([
+  const [project, quotes, canCreate, photos, photoQuota, crews] = await Promise.all([
     getProject(id),
     getQuotesByProject(id),
     canCreateQuote(),
     getPhotosByProject(id),
     canUploadPhoto(id),
+    getCrews(),
   ]);
   if (!project) return notFound();
 
@@ -95,7 +96,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             />
           </div>
         )}
-        <AddTradeForm projectId={project.id} />
+        <AddTradeForm projectId={project.id} crews={crews} />
       </div>
 
       {/* Payments section */}

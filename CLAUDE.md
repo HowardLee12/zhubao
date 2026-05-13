@@ -40,31 +40,45 @@ src/
 │   │   │   ├── page.tsx      # Trade scheduling with conflict detection
 │   │   │   └── loading.tsx   # Schedule skeleton screen
 │   │   ├── payments/
-│   │   │   ├── page.tsx      # Payment tracking
+│   │   │   ├── page.tsx      # Payment tracking (TopBar + stats + overdue banner)
 │   │   │   └── loading.tsx   # Payments skeleton screen
 │   │   └── account/
-│   │       └── page.tsx      # Account page — profile, plan, usage, logout
+│   │       ├── page.tsx      # Account — profile + plan + usage + menu list
+│   │       └── crews/page.tsx # 工班通訊錄 CRUD (name/role/phone)
 │   ├── (public)/             # Route group — no auth required
 │   │   ├── layout.tsx        # Passthrough layout
 │   │   └── quotes/[id]/share/page.tsx  # Public quote share page for homeowners
+│   ├── (auth)/quotes/[id]/line-preview/page.tsx  # LINE chat mock for the designer to preview owner view
 │   └── api/
 │       ├── quotes/[id]/      # Quote data API route (auth + ownership check)
 │       └── photos/upload/    # Photo upload API (compress → storage → DB)
 ├── components/
-│   ├── bottom-nav.tsx        # Bottom tab navigation (with prefetch)
+│   ├── ui/                   # Renoly layout primitives
+│   │   ├── top-bar.tsx       # Sticky title + subtitle + back/right slots + IconButton
+│   │   ├── hero-card.tsx     # Orange→brick gradient hero with N-col stats + progress
+│   │   ├── stat-card.tsx     # Stat tile (default/accent/dark variants)
+│   │   ├── pill.tsx          # Badge with neutral/orange/brick/green/amber/red/dark variants
+│   │   └── section-header.tsx # Section title + optional action link
+│   ├── bottom-nav.tsx        # Bottom tab navigation (auto-hidden on /line-preview)
 │   ├── liff-provider.tsx     # LINE LIFF SDK init + login trigger
 │   ├── auth-guard.tsx        # Auth gate — shows login prompt or children
-│   ├── project-card.tsx      # Project summary card
-│   ├── project-header.tsx    # Project header with edit/delete buttons
+│   ├── project-card.tsx      # Project summary card (orange progress + warm tones)
+│   ├── project-header.tsx    # TopBar + HeroCard + edit/delete actions
 │   ├── edit-project-form.tsx # Inline edit project info form
-│   ├── project-status-control.tsx # Status pills + progress slider
+│   ├── project-status-control.tsx # Segmented status pills + progress slider
 │   ├── project-quotes-section.tsx # Inline quote list + builder toggle
 │   ├── inline-quote-builder.tsx   # Inline quote creation (no page navigation)
 │   ├── trade-list.tsx        # Interactive trade list (status dropdown + swipe delete/notify)
-│   ├── payment-list.tsx      # Interactive payment list (paid toggle + swipe delete)
-│   ├── add-trade-form.tsx    # Add new trade form
+│   ├── payment-list.tsx      # Vertical timeline (paid/due/upcoming/pending dots)
+│   ├── payments-page-list.tsx # Global payments grouped by status + month
+│   ├── add-trade-form.tsx    # Add trade with crew picker (existing crews + inline new)
 │   ├── add-payment-form.tsx  # Add new payment form
+│   ├── schedule-view.tsx     # Wraps list / grid view + conflict resolution sheet
+│   ├── schedule-grid.tsx     # Drag-drop crew × week-day grid
 │   ├── schedule-trade-card.tsx # Schedule page trade card (status toggle + project link)
+│   ├── schedule-conflict-sheet.tsx # Bottom sheet: reschedule / reassign / LINE notify
+│   ├── crew-manager.tsx      # CRUD UI for crews directory
+│   ├── today-trade-strip.tsx # Dashboard horizontal strip of today's trades
 │   ├── quote-section-card.tsx # Quote section display
 │   ├── quote-version-toggle.tsx # Cost/client version switch
 │   ├── logout-button.tsx     # Logout button (clears cookies + LIFF logout)
@@ -75,25 +89,31 @@ src/
 │   ├── supabase.ts           # Supabase client (untyped, anon key)
 │   ├── liff.ts               # LINE LIFF SDK wrapper (init, login, share, isInitialized)
 │   ├── database.types.ts     # Explicit TypeScript types for DB rows
-│   ├── queries.ts            # Data access layer (getProjects, getQuote, etc.)
-│   ├── actions.ts            # Server actions (CRUD operations)
-│   ├── format.ts             # Currency, date, price calculation utils
+│   ├── queries.ts            # Data access layer (getProjects, getQuote, getCrews, etc.)
+│   ├── actions.ts            # Server actions (CRUD ops + crew mgmt + moveTrade)
+│   ├── format.ts             # Currency, date, greeting, schedule-date helpers
+│   ├── week.ts               # Week-day helpers for the schedule grid
 │   ├── image-compress.ts     # Client-side WebP/JPEG compression (photo + thumbnail)
 │   └── types.ts              # Frontend-facing types
 └── supabase/
-    └── schema.sql            # 7 tables with RLS (open policies for now)
+    ├── schema.sql                  # Base schema (open RLS for now)
+    ├── migration-add-users.sql     # LINE LIFF user table
+    ├── migration-add-user-plan.sql # free / pro plan column
+    ├── migration-add-photos.sql    # Photos with thumbnails
+    └── migration-add-crews.sql     # crews table + trades.crew_id + backfill from trades.crew text
 ```
 
 ## Database Tables
 
 1. **users** — LINE user profile, plan (`free`/`pro`)
 2. **projects** — customer info, status, progress, total amount
-3. **trades** — trade scheduling (crew, dates, status)
+3. **trades** — trade scheduling (`crew` legacy text + `crew_id` FK to crews, dates, status)
 4. **payments** — payment milestones and tracking
 5. **quotes** — versioned quotes per project
 6. **quote_sections** — categorized sections (拆除, 水電, 泥作, etc.)
 7. **quote_items** — line items with unit cost + markup %
 8. **photos** — construction photos (project_id, trade_id nullable, file_path, thumbnail_path, file_size)
+9. **crews** — per-user crew directory (name/role/phone). Backfilled from existing `trades.crew` text on migration.
 
 ## Key Features (Implemented)
 
@@ -138,11 +158,27 @@ src/
 - [x] **Photo quota** — free: 100/project, pro: unlimited
 
 ## Pending Work
+- [ ] **Apply [migration-add-crews.sql](supabase/migration-add-crews.sql)** — Supabase MCP is read-only so it must be run via dashboard SQL editor before features that read crew_id (工班通訊錄 / drag-drop grid / conflict sheet) will populate with real data
+- [ ] **Drop `trades.crew` text column** — once crew_id usage is fully verified
 - [ ] **Supabase RLS tightening** — currently open policies (`USING (true)`), need user-scoped RLS
 - [ ] **Child resource ownership checks** — trades, payments, quote items mutations need ownership verification via parent project
 - [ ] **Input validation** — zod schemas for server actions
 - [ ] **Transactional writes** — atomic quote creation via Postgres function
 - [ ] **Photo sharing** — include photos in public share page for homeowners
+
+## Renoly Refactor (2026-05-13)
+
+Visual + feature refactor mapping the prototype (sage green → warm orange/brick, 築報 → Renoly):
+
+- **P1**: Theme + brand swap; Noto Sans TC + SF Mono; sage-* tokens remapped to warm equivalents in [globals.css](src/app/globals.css)
+- **P2**: Layout primitives (TopBar / HeroCard / StatCard / Pill / SectionHeader); BottomNav glass blur
+- **P3**: Every page restyled — dashboard greeting + today strip, project hero gradient, quote total card with profit bar + hideCost toggle, schedule list with TODAY badge, payment timeline with dot rail, account menu list with hours-saved card
+- **P4**: New features
+  - `crews` table + `/account/crews` CRUD
+  - `add-trade-form` uses crew picker chips (existing + inline-create)
+  - `/schedule` toggles **list ↔ grid**; grid is a drag-drop crew × 6-day matrix using PointerEvents
+  - Cross-project conflict detection bubble up to a bottom sheet with reschedule / reassign / LINE-notify actions
+  - `/quotes/[id]/line-preview` renders a LINE chat mock so the designer can preview the homeowner view before sharing
 
 ## Known Technical Decisions
 

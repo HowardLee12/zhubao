@@ -4,12 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteProject } from "@/lib/actions";
-import { formatCurrencyShort } from "@/lib/format";
+import { formatCurrencyShort, tradeDateRange } from "@/lib/format";
 import { TopBar, TopBarIconButton } from "@/components/ui/top-bar";
 import { HeroCard } from "@/components/ui/hero-card";
 import { EditProjectForm } from "@/components/edit-project-form";
 
-const STATUS_LABEL: Record<string, string> = {
+type ProjectStatus = "planning" | "in_progress" | "completed";
+
+const STATUS_LABEL: Record<ProjectStatus, string> = {
   planning: "規劃中",
   in_progress: "施工中",
   completed: "已完工",
@@ -17,19 +19,21 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function ProjectHeader({
   project,
-  paidAmount,
-}: {
+  trades,
+  profitEstimate,
+}: Readonly<{
   project: {
     id: string;
     customer_name: string;
     address: string;
     description: string;
     total_amount: number;
-    status: "planning" | "in_progress" | "completed";
+    status: ProjectStatus;
     progress: number;
   };
-  paidAmount: number;
-}) {
+  trades: { start_date: string | null; end_date: string | null }[];
+  profitEstimate: { profit: number; margin: number } | null;
+}>) {
   const router = useRouter();
   const [showEdit, setShowEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -51,7 +55,20 @@ export function ProjectHeader({
     }
   };
 
-  const dueAmount = Math.max(0, project.total_amount - paidAmount);
+  const dateRange = tradeDateRange(trades);
+  const subtitle = dateRange ?? STATUS_LABEL[project.status];
+
+  const profitDisplay = profitEstimate
+    ? {
+        label: "利潤",
+        value: formatCurrencyShort(profitEstimate.profit),
+        sub: `${profitEstimate.margin.toFixed(0)}%`,
+      }
+    : {
+        label: "利潤",
+        value: "—",
+        sub: "待估報價",
+      };
 
   return (
     <>
@@ -61,7 +78,7 @@ export function ProjectHeader({
             {project.customer_name} · {project.description || "案件"}
           </span>
         }
-        subtitle={STATUS_LABEL[project.status] ?? project.status}
+        subtitle={subtitle}
         back={
           <Link
             href="/dashboard"
@@ -137,14 +154,7 @@ export function ProjectHeader({
             label: "客戶總價",
             value: formatCurrencyShort(project.total_amount),
           },
-          {
-            label: "已收款",
-            value: formatCurrencyShort(paidAmount),
-            sub:
-              dueAmount > 0
-                ? `待收 ${formatCurrencyShort(dueAmount)}`
-                : "全部入帳",
-          },
+          profitDisplay,
           { label: "進度", value: `${project.progress}%` },
         ]}
         progress={project.progress}

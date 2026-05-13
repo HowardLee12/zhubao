@@ -124,6 +124,37 @@ export async function getQuote(quoteId: string): Promise<QuoteWithSections | nul
   };
 }
 
+export async function getLatestQuoteTotals(
+  projectId: string
+): Promise<{ cost: number; client: number; profit: number; margin: number } | null> {
+  const { data: quotes } = await supabase
+    .from("quotes")
+    .select("id")
+    .eq("project_id", projectId)
+    .order("version", { ascending: false })
+    .limit(1);
+
+  if (!quotes?.length) return null;
+
+  const quote = await getQuote((quotes[0] as { id: string }).id);
+  if (!quote) return null;
+
+  let cost = 0;
+  let client = 0;
+  for (const section of quote.sections) {
+    for (const item of section.items) {
+      const qty = Number(item.quantity);
+      const unitCost = item.unit_cost;
+      const markup = Number(item.markup_percent);
+      cost += unitCost * qty;
+      client += Math.round(unitCost * (1 + markup / 100)) * qty;
+    }
+  }
+  const profit = client - cost;
+  const margin = client > 0 ? (profit / client) * 100 : 0;
+  return { cost, client, profit, margin };
+}
+
 export async function getQuotesByProject(projectId: string): Promise<QuoteRow[]> {
   const { data, error } = await supabase
     .from("quotes")

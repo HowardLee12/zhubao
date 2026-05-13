@@ -119,6 +119,7 @@ export function ProjectDetailView({
                 projectId={project.id}
                 projectName={project.customer_name}
                 projectAddress={project.address}
+                crewsById={crewNamesById}
               />
             )}
             <AddTradeForm projectId={project.id} crews={crews} />

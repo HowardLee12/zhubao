@@ -32,6 +32,16 @@ function groupByDate(trades: ScheduleTrade[]): Record<string, ScheduleTrade[]> {
     }, {});
 }
 
+function resolveCrewName(
+  trade: { crew: string; crew_id: string | null },
+  crewsById: Record<string, { name: string }>
+): string {
+  if (trade.crew_id && crewsById[trade.crew_id]) {
+    return crewsById[trade.crew_id].name;
+  }
+  return trade.crew;
+}
+
 export function ScheduleView({ data }: Readonly<{ data: ScheduleData }>) {
   const [view, setView] = useState<"list" | "grid">("list");
   const [conflict, setConflict] = useState<ConflictTarget | null>(null);
@@ -39,6 +49,8 @@ export function ScheduleView({ data }: Readonly<{ data: ScheduleData }>) {
   const conflictSet = new Set(data.conflictIds);
   const tradesByDate = groupByDate(data.trades);
   const unscheduled = data.trades.filter((t) => !t.start_date);
+  const crewsById: Record<string, { name: string }> = {};
+  for (const c of data.crews) crewsById[c.id] = { name: c.name };
 
   return (
     <>
@@ -90,6 +102,7 @@ export function ScheduleView({ data }: Readonly<{ data: ScheduleData }>) {
           tradesByDate={tradesByDate}
           unscheduled={unscheduled}
           conflictSet={conflictSet}
+          crewsById={crewsById}
           onSelectConflict={(crewId, dateIso, trades) =>
             setConflict({ crewId, dateIso, trades })
           }
@@ -112,16 +125,18 @@ export function ScheduleView({ data }: Readonly<{ data: ScheduleData }>) {
 function TradeRow({
   trade,
   isConflict,
+  crewsById,
   onConflictClick,
 }: Readonly<{
   trade: ScheduleTrade;
   isConflict: boolean;
+  crewsById: Record<string, { name: string }>;
   onConflictClick: () => void;
 }>) {
   const cardProps = {
     id: trade.id,
     name: trade.name,
-    crew: trade.crew,
+    crew: resolveCrewName(trade, crewsById),
     status: trade.status,
     projectId: trade.projectId,
     projectName: trade.projectName,
@@ -150,12 +165,14 @@ function ListView({
   tradesByDate,
   unscheduled,
   conflictSet,
+  crewsById,
   onSelectConflict,
 }: Readonly<{
   data: ScheduleData;
   tradesByDate: Record<string, ScheduleTrade[]>;
   unscheduled: ScheduleTrade[];
   conflictSet: Set<string>;
+  crewsById: Record<string, { name: string }>;
   onSelectConflict: (
     crewId: string | null,
     dateIso: string,
@@ -201,6 +218,7 @@ function ListView({
                 key={trade.id}
                 trade={trade}
                 isConflict={conflictSet.has(trade.id)}
+                crewsById={crewsById}
                 onConflictClick={() => {
                   const sameCrew = (a: ScheduleTrade) =>
                     (a.crew_id ?? "__none__") === (trade.crew_id ?? "__none__");
@@ -224,7 +242,7 @@ function ListView({
               trade={{
                 id: trade.id,
                 name: trade.name,
-                crew: trade.crew,
+                crew: resolveCrewName(trade, crewsById),
                 status: trade.status,
                 projectId: trade.projectId,
                 projectName: trade.projectName,

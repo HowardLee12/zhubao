@@ -31,12 +31,14 @@ export function TradeList({
   projectId,
   projectName,
   projectAddress,
-}: {
+  crewsById,
+}: Readonly<{
   trades: TradeRow[];
   projectId: string;
   projectName: string;
   projectAddress: string;
-}) {
+  crewsById?: Record<string, { name: string; role: string; phone: string }>;
+}>) {
   const router = useRouter();
   const [optimisticStatuses, setOptimisticStatuses] = useState<Record<string, TradeStatus>>({});
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -45,6 +47,13 @@ export function TradeList({
 
   const getStatus = (trade: TradeRow): TradeStatus =>
     optimisticStatuses[trade.id] ?? trade.status;
+
+  const resolveCrew = (trade: TradeRow): string => {
+    if (trade.crew_id && crewsById?.[trade.crew_id]) {
+      return crewsById[trade.crew_id].name;
+    }
+    return trade.crew || "未指定工班";
+  };
 
   const handleStatusChange = async (trade: TradeRow, newStatus: TradeStatus) => {
     if (newStatus === getStatus(trade)) return;
@@ -90,7 +99,7 @@ export function TradeList({
       `案件：${projectName}`,
       `地點：${projectAddress}`,
       `日期：${dateRange}`,
-      trade.crew ? `工班：${trade.crew}` : "",
+      `工班：${resolveCrew(trade)}`,
       "",
       "— Renoly",
     ].filter(Boolean);
@@ -154,7 +163,7 @@ export function TradeList({
                 <div className={`text-[13px] ${status === "active" ? "font-semibold" : ""}`}>
                   {trade.name}
                 </div>
-                <div className="text-[11px] text-muted-foreground">{trade.crew || "未指定工班"}</div>
+                <div className="text-[11px] text-muted-foreground">{resolveCrew(trade)}</div>
               </div>
 
               <div className="text-[11px] text-muted-foreground shrink-0">

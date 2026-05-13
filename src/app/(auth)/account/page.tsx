@@ -76,7 +76,7 @@ export default async function AccountPage() {
                   {usage.quoteCount} / {quoteLimit === Infinity ? "無限" : quoteLimit}
                 </span>
               </div>
-              {isFreePlan && (
+              {isFreePlan && quoteLimit !== Infinity && (
                 <div className="w-full bg-gray-100 rounded-full h-1.5">
                   <div
                     className={`h-1.5 rounded-full transition-all ${
@@ -95,7 +95,7 @@ export default async function AccountPage() {
                   {usage.projectCount} / {projectLimit === Infinity ? "無限" : projectLimit}
                 </span>
               </div>
-              {isFreePlan && (
+              {isFreePlan && projectLimit !== Infinity && (
                 <div className="w-full bg-gray-100 rounded-full h-1.5">
                   <div
                     className={`h-1.5 rounded-full transition-all ${

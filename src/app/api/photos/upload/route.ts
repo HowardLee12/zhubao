@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   const quota = await canUploadPhoto(projectId);
   if (!quota.allowed) {
     return NextResponse.json(
-      { error: "免費方案每個案件最多 10 張照片，請升級為專業版" },
+      { error: "免費方案每個案件最多 100 張照片，請升級為專業版" },
       { status: 403 }
     );
   }

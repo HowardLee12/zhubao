@@ -104,7 +104,7 @@ export function PhotoUpload({
   if (!allowed) {
     return (
       <div className="text-center py-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
-        免費方案每個案件最多 10 張照片，請至帳號頁升級
+        免費方案每個案件最多 100 張照片，請至帳號頁升級
       </div>
     );
   }

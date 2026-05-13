@@ -1,17 +1,19 @@
-# 築報工程管理 — Reno Demo
+# Renoly — Reno Demo
 
 ## Project Overview
 
 Taiwan renovation industry SaaS tool — mobile-first web app for small (1-5 person) renovation studios. Core feature: **dual-version quoting** (cost version for designer, client version for homeowner) with automatic markup calculation. Integrates with LINE (LIFF) as primary distribution channel.
 
-- **Color theme**: Sage Green
+- **Brand**: Renoly (renamed from 築報, 2026-05-13)
+- **Color theme**: Warm orange/brick (`--orange #E2691F`, `--brick #A04428`, ink-warm scale). Legacy `sage-*` Tailwind tokens are remapped to warm equivalents in `globals.css` to avoid churning every file.
+- **Typography**: Noto Sans TC (body) + SF Mono (numbers)
 - **Language**: Traditional Chinese (zh-TW)
 - **Target**: Mobile-first (max-width 430px)
 
 ## Tech Stack
 
 - **Framework**: Next.js 16.1.7 (App Router, TypeScript, Turbopack)
-- **Styling**: Tailwind CSS v4 with custom Sage Green theme
+- **Styling**: Tailwind CSS v4 with Renoly warm theme
 - **Database**: Supabase (PostgreSQL) — free tier
 - **Auth**: LINE LIFF SDK → Supabase (login via LINE in external browser + in-app browser)
 - **Deployment**: Vercel
@@ -128,12 +130,12 @@ src/
 - [x] **API security** — `/api/quotes/[id]` has auth + ownership check, UUID validation
 - [x] **Vercel deployment** — production deploy with env vars
 - [x] **Account page** — profile display, plan info, usage stats, logout
-- [x] **Free plan quota** — free users limited to 1 quote, enforced in server action + UI
+- [x] **Free plan quota** — free: 20 quotes, unlimited projects, 100 photos/project (data-gravity strategy), enforced in server action + UI
 - [x] **Bottom nav restructured** — 案件, 排程, 收款, 帳號 (removed 報價單 tab)
 - [x] **施工照片管理** — upload, compress (WebP/JPEG), tag to trade, thumbnail grid, lightbox viewer, delete
 - [x] **Photo compression** — client-side canvas resize: main ~300KB (1200px), thumbnail ~30KB (300px)
 - [x] **Photo storage** — Supabase Storage bucket `photos`, path: `{userId}/{projectId}/{uuid}.ext`
-- [x] **Photo quota** — free: 10/project, pro: unlimited
+- [x] **Photo quota** — free: 100/project, pro: unlimited
 
 ## Pending Work
 - [ ] **Supabase RLS tightening** — currently open policies (`USING (true)`), need user-scoped RLS

@@ -63,7 +63,15 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-border flex z-50">
+    <nav
+      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] grid grid-cols-4 z-50 border-t border-warm-border"
+      style={{
+        background: "rgba(255, 251, 244, 0.92)",
+        backdropFilter: "blur(20px) saturate(160%)",
+        WebkitBackdropFilter: "blur(20px) saturate(160%)",
+        paddingBottom: "env(safe-area-inset-bottom, 8px)",
+      }}
+    >
       {navItems.map((item) => {
         const isActive = pathname === item.href ||
           (item.href !== "/dashboard" && pathname.startsWith(item.href));
@@ -74,14 +82,12 @@ export function BottomNav() {
             key={item.href}
             href={item.href}
             prefetch={true}
-            className={`flex-1 flex flex-col items-center py-2 gap-0.5 transition-colors ${
-              isActive
-                ? "text-primary"
-                : "text-muted-foreground"
+            className={`flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${
+              isActive ? "text-orange" : "text-ink-3"
             }`}
           >
             <Icon />
-            <span className={`text-[10px] ${isActive ? "font-semibold" : ""}`}>
+            <span className={`text-[10px] tracking-wide ${isActive ? "font-semibold" : "font-medium"}`}>
               {item.label}
             </span>
           </Link>

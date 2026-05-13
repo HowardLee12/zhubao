@@ -1,31 +1,59 @@
 @import "tailwindcss";
 
 :root {
-  --sage-50: #f6f7f4;
-  --sage-100: #e8ebe3;
-  --sage-200: #d1d7c7;
-  --sage-300: #b3bda3;
-  --sage-400: #95a37f;
-  --sage-500: #7a8b66;
-  --sage-600: #5f6e4f;
-  --sage-700: #4a5640;
-  --sage-800: #3d4636;
-  --sage-900: #333b2e;
-  --sage-950: #1a1f16;
+  /* ===== Renoly warm palette ===== */
+  --bg-app: #FAF6F0;
+  --bg-warm: #F4ECDD;
+  --surface: #FFFFFF;
+  --surface-warm: #FFFBF4;
+  --ink: #1A1410;
+  --ink-2: #5A4D40;
+  --ink-3: #9C8A78;
+  --ink-4: #C2B4A0;
+  --warm-border: #E8DECF;
+  --warm-border-strong: #D4C5AE;
 
-  --background: var(--sage-50);
-  --foreground: var(--sage-950);
-  --card: #ffffff;
-  --card-foreground: var(--sage-900);
-  --primary: var(--sage-600);
+  --orange: #E2691F;
+  --orange-deep: #C5571A;
+  --orange-soft: #FCE9D7;
+  --brick: #A04428;
+  --brick-soft: #F0DAD0;
+  --warm-green: #2E7D5B;
+  --warm-green-soft: #DAEDDF;
+  --amber: #C88B1A;
+  --amber-soft: #FAE9C2;
+  --warm-red: #C8462C;
+  --warm-red-soft: #F8D8CE;
+  --line-green: #06C755;
+
+  /* ===== Legacy sage-* tokens remapped onto warm palette =====
+     Existing components still reference these names; remapping
+     avoids a global search/replace and keeps the diff focused. */
+  --sage-50:  #FAF6F0; /* bg-app */
+  --sage-100: #F4ECDD; /* bg-warm */
+  --sage-200: #E8DECF; /* border */
+  --sage-300: #D4C5AE; /* border-strong */
+  --sage-400: #C2B4A0; /* ink-4 */
+  --sage-500: #9C8A78; /* ink-3 */
+  --sage-600: #E2691F; /* PRIMARY -> orange */
+  --sage-700: #C5571A; /* orange-deep */
+  --sage-800: #5A4D40; /* ink-2 */
+  --sage-900: #1A1410; /* ink */
+  --sage-950: #1A1410;
+
+  --background: var(--bg-app);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --primary: var(--orange);
   --primary-foreground: #ffffff;
-  --muted: var(--sage-100);
-  --muted-foreground: var(--sage-500);
-  --border: var(--sage-200);
-  --accent: var(--sage-100);
-  --destructive: #dc2626;
-  --warning: #d97706;
-  --success: var(--sage-600);
+  --muted: var(--bg-warm);
+  --muted-foreground: var(--ink-3);
+  --border: var(--warm-border);
+  --accent: var(--orange-soft);
+  --destructive: var(--warm-red);
+  --warning: var(--amber);
+  --success: var(--warm-green);
 }
 
 @theme inline {
@@ -42,6 +70,8 @@
   --color-destructive: var(--destructive);
   --color-warning: var(--warning);
   --color-success: var(--success);
+
+  /* Legacy sage scale, now warm */
   --color-sage-50: var(--sage-50);
   --color-sage-100: var(--sage-100);
   --color-sage-200: var(--sage-200);
@@ -53,14 +83,39 @@
   --color-sage-800: var(--sage-800);
   --color-sage-900: var(--sage-900);
   --color-sage-950: var(--sage-950);
+
+  /* New Renoly-specific tokens */
+  --color-orange: var(--orange);
+  --color-orange-deep: var(--orange-deep);
+  --color-orange-soft: var(--orange-soft);
+  --color-brick: var(--brick);
+  --color-brick-soft: var(--brick-soft);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-surface: var(--surface);
+  --color-surface-warm: var(--surface-warm);
+  --color-bg-warm: var(--bg-warm);
+  --color-warm-border: var(--warm-border);
+  --color-warm-border-strong: var(--warm-border-strong);
+  --color-line-green: var(--line-green);
+
+  --font-mono: "SF Mono", "Roboto Mono", ui-monospace, Menlo, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  font-family: "Noto Sans TC", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
   max-width: 430px;
   margin: 0 auto;
   min-height: 100dvh;
   position: relative;
+}
+
+/* Tabular numbers for monospace-displayed prices */
+.mono, .font-mono {
+  font-variant-numeric: tabular-nums;
 }

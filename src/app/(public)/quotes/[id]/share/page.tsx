@@ -35,8 +35,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!quote) return { title: "報價單" };
 
   return {
-    title: `報價單 v${quote.version} — 築報`,
-    description: "裝潢工程報價明細",
+    title: `報價單 v${quote.version} — Renoly`,
+    description: "裝修工程報價明細",
   };
 }
 
@@ -71,7 +71,7 @@ export default async function QuoteSharePage({
     <div className="min-h-screen bg-background">
       <header className="bg-primary text-primary-foreground px-4 py-4">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-medium opacity-80">築報</span>
+          <span className="text-xs font-medium opacity-80">Renoly</span>
         </div>
         <div className="text-lg font-bold">報價單</div>
         <div className="text-xs opacity-80">
@@ -126,7 +126,7 @@ export default async function QuoteSharePage({
 
       <div className="px-4 pb-8 text-center">
         <div className="text-[11px] text-muted-foreground">
-          由築報產生 · 裝潢工程報價與管理工具
+          由 Renoly 產生 · 裝修工程報價與管理工具
         </div>
       </div>
     </div>

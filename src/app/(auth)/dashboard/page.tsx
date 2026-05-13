@@ -1,97 +1,161 @@
 import { ProjectCard } from "@/components/project-card";
-import { getProjects, canCreateProject } from "@/lib/queries";
-import { formatCurrency } from "@/lib/format";
+import { TodayTradeStrip } from "@/components/today-trade-strip";
+import { TopBar, TopBarIconButton } from "@/components/ui/top-bar";
+import { StatCard } from "@/components/ui/stat-card";
+import { SectionHeader } from "@/components/ui/section-header";
+import { Pill } from "@/components/ui/pill";
+import { getProjects, getUserProfile, canCreateProject } from "@/lib/queries";
+import { formatCurrencyShort, formatDateLong, greeting } from "@/lib/format";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
-  const [projects, canCreate] = await Promise.all([
+function startOfMonth(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+export default async function DashboardPage() {
+  const [projects, profile, canCreate] = await Promise.all([
     getProjects(),
+    getUserProfile(),
     canCreateProject(),
   ]);
 
+  const now = new Date();
+  const monthStart = startOfMonth(now);
+  const allPayments = projects.flatMap((p) => p.payments);
+
+  const duePayments = allPayments.filter(
+    (p) => p.status === "due" || p.status === "upcoming"
+  );
+  const totalDue = duePayments.reduce((s, p) => s + p.amount, 0);
+  const nextDue = duePayments
+    .filter((p) => p.due_date)
+    .sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1))[0];
+
+  const paidThisMonth = allPayments.filter(
+    (p) => p.status === "paid" && p.paid_date && p.paid_date >= monthStart
+  );
+  const totalPaidMonth = paidThisMonth.reduce((s, p) => s + p.amount, 0);
+
   const activeProjects = projects.filter((p) => p.status !== "completed");
-  const totalReceivable = projects
-    .flatMap((p) => p.payments)
-    .filter((p) => p.status === "due" || p.status === "upcoming")
-    .reduce((sum, p) => sum + p.amount, 0);
-  const totalPaid = projects
-    .flatMap((p) => p.payments)
-    .filter((p) => p.status === "paid")
-    .reduce((sum, p) => sum + p.amount, 0);
+  const allTrades = projects.flatMap((p) =>
+    p.trades.map((t) => ({ ...t, project_address: p.address }))
+  );
+
+  const dueLabel = (() => {
+    if (nextDue?.due_date) {
+      return `${duePayments.length} 筆 · ${nextDue.due_date.slice(5).replace("-", "/")} 到期`;
+    }
+    if (duePayments.length > 0) return `${duePayments.length} 筆待收`;
+    return "本期清空";
+  })();
 
   return (
     <div>
-      <header className="bg-primary text-primary-foreground px-4 py-4 flex justify-between items-center">
-        <div>
-          <div className="text-lg font-bold">築報工程管理</div>
-          <div className="text-xs opacity-80">{projects.length} 個案件</div>
-        </div>
-        {canCreate ? (
-          <Link
-            href="/projects/new"
-            className="bg-white/20 text-white text-sm px-3 py-1.5 rounded-lg font-medium"
-          >
-            + 新案件
-          </Link>
-        ) : (
-          <Link
-            href="/account"
-            className="bg-white/10 text-white/60 text-sm px-3 py-1.5 rounded-lg font-medium"
-          >
-            已達上限
-          </Link>
-        )}
-      </header>
+      <TopBar
+        title={`${greeting(now)}，${profile?.display_name || "工程夥伴"}`}
+        subtitle={formatDateLong(now)}
+        right={
+          <TopBarIconButton href="/schedule" ariaLabel="今日排程">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M6 8a6 6 0 0 1 12 0c0 5 2 7 2 7H4s2-2 2-7" />
+              <path d="M10 19a2 2 0 0 0 4 0" />
+            </svg>
+          </TopBarIconButton>
+        }
+      />
 
-      <div className="grid grid-cols-2 gap-2.5 p-4">
-        <div className="bg-card rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] text-muted-foreground">進行中</div>
-          <div className="text-2xl font-bold text-primary">{activeProjects.length}</div>
-        </div>
-        <div className="bg-card rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] text-muted-foreground">已收款</div>
-          <div className="text-lg font-bold text-sage-700">{formatCurrency(totalPaid)}</div>
-        </div>
-        <div className="bg-card rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] text-muted-foreground">待收款</div>
-          <div className="text-lg font-bold text-destructive">{formatCurrency(totalReceivable)}</div>
-        </div>
-        <div className="bg-card rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] text-muted-foreground">案件總額</div>
-          <div className="text-lg font-bold text-sage-800">
-            {formatCurrency(projects.reduce((s, p) => s + p.total_amount, 0))}
-          </div>
-        </div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-2 px-4 mt-1">
+        <StatCard
+          variant="accent"
+          label="待收款"
+          value={formatCurrencyShort(totalDue)}
+          delta={dueLabel}
+        />
+        <StatCard
+          label="本月已入帳"
+          value={formatCurrencyShort(totalPaidMonth)}
+          delta={`${paidThisMonth.length} 筆已入帳`}
+          deltaColor={paidThisMonth.length > 0 ? "success" : "default"}
+        />
       </div>
 
-      <div className="px-4 pb-4 space-y-4">
-        <div className="text-sm font-semibold text-sage-800">所有案件</div>
-        {projects.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            <div className="text-sm">還沒有案件</div>
-            {canCreate ? (
-              <Link
-                href="/projects/new"
-                className="inline-block mt-3 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium"
-              >
-                建立第一個案件
-              </Link>
-            ) : (
-              <Link
-                href="/account"
-                className="inline-block mt-3 text-primary text-sm font-medium"
-              >
-                升級方案以建立更多案件
-              </Link>
-            )}
-          </div>
-        )}
-        {projects.map((project) => (
-          <ProjectCard key={project.id} project={project} />
-        ))}
-      </div>
+      {/* Today */}
+      <SectionHeader
+        title={`今日工地 · ${formatDateLong(now).slice(0, formatDateLong(now).indexOf(" "))}`}
+        action={{ label: "查看排程", href: "/schedule" }}
+      />
+      <TodayTradeStrip trades={allTrades} projects={projects} />
+
+      {/* Active projects */}
+      <SectionHeader
+        title={`進行中案件 · ${activeProjects.length}`}
+        action={canCreate ? { label: "新增", href: "/projects/new" } : undefined}
+      />
+
+      {projects.length === 0 ? (
+        <div className="text-center py-10 px-6">
+          <div className="text-sm text-ink-3 mb-3">還沒有案件</div>
+          {canCreate ? (
+            <Link
+              href="/projects/new"
+              className="inline-block bg-orange text-white px-4 py-2.5 rounded-xl text-sm font-semibold"
+            >
+              建立第一個案件
+            </Link>
+          ) : (
+            <Link href="/account" className="text-orange text-sm font-medium">
+              升級方案 →
+            </Link>
+          )}
+        </div>
+      ) : (
+        <>
+          {projects.map((project) => (
+            <ProjectCard key={project.id} project={project} />
+          ))}
+          {canCreate && (
+            <Link
+              href="/projects/new"
+              className="mx-4 mt-2 mb-6 block py-4 rounded-2xl border-2 border-dashed border-warm-border-strong bg-surface-warm text-center text-sm font-medium text-ink-2"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                新增案件
+              </span>
+            </Link>
+          )}
+        </>
+      )}
+
+      {!canCreate && (
+        <div className="mx-4 mb-6 px-3 py-2.5 rounded-xl bg-orange-soft border border-orange/30 text-[12px] text-orange-deep flex items-center justify-between">
+          <span>案件數已達免費方案上限</span>
+          <Link href="/account" className="font-semibold">
+            升級 →
+          </Link>
+        </div>
+      )}
+
+      {/* hint of plan */}
+      {profile?.plan === "free" && (
+        <div className="mx-4 mb-6">
+          <Pill variant="neutral">免費方案</Pill>
+        </div>
+      )}
     </div>
   );
 }

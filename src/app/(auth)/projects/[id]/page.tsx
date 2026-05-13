@@ -32,12 +32,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     };
   }
 
+  const paidAmount = project.payments
+    .filter((p) => p.status === "paid")
+    .reduce((sum, p) => sum + p.amount, 0);
+
   return (
-    <div>
-      <ProjectHeader project={project} />
+    <div className="pb-24">
+      <ProjectHeader project={project} paidAmount={paidAmount} />
 
       {/* Status & Progress */}
-      <div className="p-4">
+      <div className="px-4 pb-3">
         <ProjectStatusControl
           projectId={project.id}
           currentStatus={project.status}
@@ -46,16 +50,21 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {/* Quotes for this project */}
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-3">
         <ProjectQuotesSection projectId={project.id} quotes={quotes} canCreate={canCreate} />
       </div>
 
       {/* Photos section */}
-      <div className="px-4 pb-4">
-        <div className="text-sm font-semibold text-sage-800 mb-3">
-          施工照片{photos.length > 0 && <span className="text-muted-foreground font-normal ml-1">({photos.length})</span>}
+      <div className="px-4 pb-3">
+        <div className="text-[13px] font-semibold text-ink-2 mb-2 tracking-wider">
+          施工照片
+          {photos.length > 0 && (
+            <span className="text-ink-3 font-normal ml-1 font-mono">
+              ({photos.length})
+            </span>
+          )}
         </div>
-        <div className="bg-card rounded-xl shadow-sm p-3 space-y-3">
+        <div className="bg-surface rounded-2xl border border-warm-border p-3 space-y-3">
           <PhotoGrid
             photos={photos}
             trades={project.trades}
@@ -72,19 +81,28 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {/* Trades section */}
-      <div className="px-4 pb-4">
-        <div className="text-sm font-semibold text-sage-800 mb-3">工種進度</div>
+      <div className="px-4 pb-3">
+        <div className="text-[13px] font-semibold text-ink-2 mb-2 tracking-wider">
+          工種進度
+        </div>
         {project.trades.length > 0 && (
           <div className="mb-3">
-            <TradeList trades={project.trades} projectId={project.id} projectName={project.customer_name} projectAddress={project.address} />
+            <TradeList
+              trades={project.trades}
+              projectId={project.id}
+              projectName={project.customer_name}
+              projectAddress={project.address}
+            />
           </div>
         )}
         <AddTradeForm projectId={project.id} />
       </div>
 
       {/* Payments section */}
-      <div className="px-4 pb-4">
-        <div className="text-sm font-semibold text-sage-800 mb-3">收款進度</div>
+      <div className="px-4 pb-3">
+        <div className="text-[13px] font-semibold text-ink-2 mb-2 tracking-wider">
+          收款進度
+        </div>
         {project.payments.length > 0 && (
           <div className="mb-3">
             <PaymentList

@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "築報工程管理 — 裝潢設計師的報價、排程、收款工具";
+export const alt = "Renoly — 裝修小隊的接案管家：報價、排程、收款一站搞定";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -16,15 +16,15 @@ export default function OGImage() {
           flexDirection: "column",
           justifyContent: "center",
           padding: "80px",
-          background: "linear-gradient(135deg, #5C6B55 0%, #3D4A37 100%)",
+          background: "linear-gradient(135deg, #E2691F 0%, #A04428 100%)",
           fontFamily: "system-ui, sans-serif",
         }}
       >
-        <div style={{ fontSize: 80, fontWeight: 800, color: "white", marginBottom: 16 }}>
-          築報工程管理
+        <div style={{ fontSize: 96, fontWeight: 800, color: "white", marginBottom: 16, letterSpacing: "-0.02em" }}>
+          Renoly
         </div>
         <div style={{ fontSize: 36, color: "rgba(255,255,255,0.85)", marginBottom: 40 }}>
-          裝潢設計師的最佳工具
+          裝修小隊的接案管家
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ fontSize: 28, color: "rgba(255,255,255,0.7)" }}>

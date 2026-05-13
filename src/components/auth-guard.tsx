@@ -8,7 +8,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background">
-        <div className="text-2xl font-bold text-primary mb-2">築報</div>
+        <div className="text-3xl font-extrabold text-primary mb-2 tracking-tight">Renoly</div>
         <div className="text-sm text-muted-foreground">載入中...</div>
       </div>
     );
@@ -17,13 +17,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background px-6">
-        <div className="text-2xl font-bold text-primary mb-2">築報</div>
+        <div className="text-3xl font-extrabold text-primary mb-2 tracking-tight">Renoly</div>
         <div className="text-sm text-muted-foreground text-center mb-6">
-          裝潢工程報價與管理工具
+          裝修小隊的接案管家
         </div>
         <div className="bg-card rounded-xl shadow-sm p-6 w-full max-w-sm text-center">
           <div className="text-sm text-sage-700 mb-4">
-            請從 LINE 開啟築報
+            請從 LINE 開啟 Renoly
           </div>
           <a
             href={`https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}`}

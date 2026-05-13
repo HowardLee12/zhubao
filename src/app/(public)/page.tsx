@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "築報工程管理 — 裝潢設計師的報價、排程、收款工具",
+  title: "Renoly — 裝修小隊的接案管家",
   description:
     "雙版本報價自動算利潤，工班排程衝突偵測，收款追蹤一目瞭然，施工照片按工種分類。手機直接開，不用裝 APP。",
 };
@@ -67,12 +67,12 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero */}
-      <section className="bg-gradient-to-br from-sage-700 to-sage-900 text-white px-6 py-16 text-center">
-        <h1 className="text-3xl font-extrabold mb-3 leading-tight">
-          築報工程管理
+      <section className="bg-gradient-to-br from-orange to-brick text-white px-6 py-16 text-center">
+        <h1 className="text-4xl font-extrabold mb-3 leading-tight tracking-tight">
+          Renoly
         </h1>
         <p className="text-base opacity-90 mb-2">
-          裝潢設計師的報價、排程、收款工具
+          裝修小隊的接案管家
         </p>
         <p className="text-sm opacity-70 mb-8">
           手機直接開，不用裝 APP
@@ -161,15 +161,15 @@ export default function LandingPage() {
             <ul className="space-y-2 text-sm text-sage-600">
               <li className="flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                3 張報價單
+                無限案件管理
               </li>
               <li className="flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                1 個案件
+                20 張報價單
               </li>
               <li className="flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                10 張施工照片/案件
+                100 張施工照片/案件
               </li>
               <li className="flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
@@ -229,7 +229,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="px-5 py-8 text-center text-xs text-sage-500 border-t border-sage-200">
-        <p className="font-semibold text-sage-700 mb-2">築報工程管理</p>
+        <p className="font-semibold text-sage-700 mb-2">Renoly</p>
         <p>聯絡電話：0978-156237</p>
         <p>Email：wei00925@gmail.com</p>
         <p className="mt-3">

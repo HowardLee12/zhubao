@@ -92,7 +92,7 @@ export function TradeList({
       `日期：${dateRange}`,
       trade.crew ? `工班：${trade.crew}` : "",
       "",
-      "— 築報",
+      "— Renoly",
     ].filter(Boolean);
 
     const text = lines.join("\n");

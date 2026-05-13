@@ -83,10 +83,10 @@ export async function shareQuoteToLine(quoteUrl: string, projectName: string, to
               contents: [
                 {
                   type: "text",
-                  text: "築報",
+                  text: "Renoly",
                   weight: "bold",
                   size: "sm",
-                  color: "#5f6e4f",
+                  color: "#E2691F",
                 },
                 {
                   type: "text",
@@ -97,7 +97,7 @@ export async function shareQuoteToLine(quoteUrl: string, projectName: string, to
                 },
               ],
               paddingAll: "20px",
-              backgroundColor: "#f6f7f4",
+              backgroundColor: "#FAF6F0",
             },
             body: {
               type: "box",
@@ -129,7 +129,7 @@ export async function shareQuoteToLine(quoteUrl: string, projectName: string, to
                       type: "text",
                       text: totalAmount,
                       size: "md",
-                      color: "#5f6e4f",
+                      color: "#E2691F",
                       weight: "bold",
                       align: "end",
                     },
@@ -149,7 +149,7 @@ export async function shareQuoteToLine(quoteUrl: string, projectName: string, to
                     uri: quoteUrl,
                   },
                   style: "primary",
-                  color: "#5f6e4f",
+                  color: "#E2691F",
                 },
               ],
               paddingAll: "12px",

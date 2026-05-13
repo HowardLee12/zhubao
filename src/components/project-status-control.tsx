@@ -5,9 +5,9 @@ import { updateProject } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 
 const STATUSES = [
-  { value: "planning", label: "規劃中", className: "bg-amber-50 text-amber-700 border-amber-200" },
-  { value: "in_progress", label: "施工中", className: "bg-sage-100 text-sage-700 border-sage-200" },
-  { value: "completed", label: "已完工", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  { value: "planning", label: "規劃中" },
+  { value: "in_progress", label: "施工中" },
+  { value: "completed", label: "已完工" },
 ] as const;
 
 type ProjectStatus = "planning" | "in_progress" | "completed";
@@ -28,11 +28,16 @@ export function ProjectStatusControl({
 
   const handleStatusChange = async (newStatus: ProjectStatus) => {
     setStatus(newStatus);
-    const newProgress = newStatus === "completed" ? 100 : newStatus === "planning" ? 0 : progress;
+    let newProgress = progress;
+    if (newStatus === "completed") newProgress = 100;
+    else if (newStatus === "planning") newProgress = 0;
     setProgress(newProgress);
     setSaving(true);
     try {
-      await updateProject(projectId, { status: newStatus, progress: newProgress });
+      await updateProject(projectId, {
+        status: newStatus,
+        progress: newProgress,
+      });
       router.refresh();
     } catch {
       setStatus(currentStatus);
@@ -56,26 +61,28 @@ export function ProjectStatusControl({
   };
 
   return (
-    <div className="space-y-3">
-      {/* Status pills */}
-      <div className="flex gap-2">
-        {STATUSES.map((s) => (
-          <button
-            key={s.value}
-            onClick={() => handleStatusChange(s.value)}
-            disabled={saving}
-            className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${
-              status === s.value
-                ? s.className
-                : "bg-white text-muted-foreground border-border"
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
+    <div className="bg-surface rounded-2xl border border-warm-border p-4 space-y-3">
+      <div className="flex gap-1 p-1 bg-bg-warm rounded-xl">
+        {STATUSES.map((s) => {
+          const active = status === s.value;
+          return (
+            <button
+              key={s.value}
+              type="button"
+              onClick={() => handleStatusChange(s.value)}
+              disabled={saving}
+              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
+                active
+                  ? "bg-surface text-orange shadow-sm"
+                  : "text-ink-2"
+              }`}
+            >
+              {s.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Progress slider */}
       {status !== "completed" && (
         <div className="flex items-center gap-3">
           <input
@@ -87,9 +94,9 @@ export function ProjectStatusControl({
             onChange={(e) => setProgress(Number(e.target.value))}
             onMouseUp={() => handleProgressChange(progress)}
             onTouchEnd={() => handleProgressChange(progress)}
-            className="flex-1 h-2 appearance-none bg-sage-100 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer"
+            className="flex-1 h-2 appearance-none bg-bg-warm rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-orange [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow"
           />
-          <span className="text-sm font-bold text-primary min-w-[40px] text-right">
+          <span className="text-sm font-bold text-orange min-w-[40px] text-right font-mono tabular-nums">
             {progress}%
           </span>
         </div>

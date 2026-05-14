@@ -487,13 +487,38 @@ export async function deleteCrew(crewId: string) {
 }
 
 // Move trade to (crew, date). Used by drag-drop grid.
+// Preserves the original trade duration: if it was a 3-day trade, the moved
+// version stays 3 days. Without this the end_date stays put and ends up
+// before start_date, which causes the trade to silently disappear from
+// the schedule (date-in-range checks fail).
 export async function moveTrade(
   tradeId: string,
   target: { crewId: string | null; startDate: string; projectId?: string }
 ) {
+  const { data: current } = await supabase
+    .from("trades")
+    .select("start_date, end_date")
+    .eq("id", tradeId)
+    .single();
+
+  let newEndDate: string | null = null;
+  if (current?.start_date && current?.end_date) {
+    // Compute duration in days (UTC math is fine for ISO date strings)
+    const oldStartMs = Date.parse(`${current.start_date}T00:00:00Z`);
+    const oldEndMs = Date.parse(`${current.end_date}T00:00:00Z`);
+    const durationDays = Math.max(
+      0,
+      Math.round((oldEndMs - oldStartMs) / 86400000)
+    );
+    const newStartMs = Date.parse(`${target.startDate}T00:00:00Z`);
+    const newEnd = new Date(newStartMs + durationDays * 86400000);
+    newEndDate = `${newEnd.getUTCFullYear()}-${String(newEnd.getUTCMonth() + 1).padStart(2, "0")}-${String(newEnd.getUTCDate()).padStart(2, "0")}`;
+  }
+
   const updateData: Record<string, unknown> = {
     crew_id: target.crewId,
     start_date: target.startDate,
+    end_date: newEndDate,
   };
 
   const { error } = await supabase

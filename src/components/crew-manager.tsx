@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createCrew, updateCrew, deleteCrew } from "@/lib/actions";
+import { createCrew, updateCrew, deleteCrew, toggleCrewVisibility } from "@/lib/actions";
 import type { CrewRow } from "@/lib/database.types";
 
 interface CrewFormState {
@@ -45,6 +45,25 @@ export function CrewManager({ initialCrews }: Readonly<{ initialCrews: CrewRow[]
       setEditingId(null);
       refresh();
     } catch (e) {
+      setError(e instanceof Error ? e.message : "更新失敗");
+    }
+  };
+
+  const onToggleVisibility = async (crew: CrewRow) => {
+    const next = !crew.hidden_in_schedule;
+    setCrews((prev) =>
+      prev.map((c) => (c.id === crew.id ? { ...c, hidden_in_schedule: next } : c))
+    );
+    try {
+      await toggleCrewVisibility(crew.id, next);
+      refresh();
+    } catch (e) {
+      // rollback
+      setCrews((prev) =>
+        prev.map((c) =>
+          c.id === crew.id ? { ...c, hidden_in_schedule: !next } : c
+        )
+      );
       setError(e instanceof Error ? e.message : "更新失敗");
     }
   };
@@ -98,6 +117,7 @@ export function CrewManager({ initialCrews }: Readonly<{ initialCrews: CrewRow[]
                   crew={crew}
                   onEdit={() => setEditingId(crew.id)}
                   onDelete={() => onDelete(crew)}
+                  onToggleVisibility={() => onToggleVisibility(crew)}
                 />
               )}
             </div>
@@ -143,13 +163,16 @@ function CrewDisplay({
   crew,
   onEdit,
   onDelete,
+  onToggleVisibility,
 }: Readonly<{
   crew: CrewRow;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleVisibility: () => void;
 }>) {
+  const dimmed = crew.hidden_in_schedule;
   return (
-    <div className="flex items-center gap-3">
+    <div className={`flex items-center gap-3 ${dimmed ? "opacity-55" : ""}`}>
       <div
         className="w-11 h-11 rounded-full shrink-0 flex items-center justify-center text-white font-bold text-sm"
         style={{
@@ -164,9 +187,32 @@ function CrewDisplay({
         <div className="text-[11px] text-ink-3 truncate font-mono">
           {crew.role || "未分類"}
           {crew.phone ? ` · ${crew.phone}` : ""}
+          {dimmed ? " · 已從排程隱藏" : ""}
         </div>
       </div>
       <div className="shrink-0 flex gap-1.5">
+        <button
+          type="button"
+          onClick={onToggleVisibility}
+          aria-label={dimmed ? "在排程顯示" : "從排程隱藏"}
+          title={dimmed ? "在排程顯示" : "從排程隱藏"}
+          className={`w-9 h-9 rounded-xl border flex items-center justify-center ${
+            dimmed
+              ? "bg-bg-warm border-warm-border text-ink-3"
+              : "bg-surface-warm border-warm-border text-ink-2"
+          }`}
+        >
+          {dimmed ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 3l18 18M10 6a10 10 0 0 1 12 6 17 17 0 0 1-2.6 3.3M6.7 6.7C3.6 8.4 2 12 2 12s4 7 10 7a10 10 0 0 0 5.3-1.5" />
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          )}
+        </button>
         {crew.phone && (
           <a
             href={`tel:${crew.phone}`}

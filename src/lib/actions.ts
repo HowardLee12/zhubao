@@ -445,7 +445,7 @@ export async function createCrew(data: {
 
 export async function updateCrew(
   crewId: string,
-  data: { name?: string; role?: string; phone?: string }
+  data: { name?: string; role?: string; phone?: string; hiddenInSchedule?: boolean }
 ) {
   const userId = await getUserId();
   if (!userId) throw new Error("請先登入");
@@ -454,6 +454,7 @@ export async function updateCrew(
   if (data.name !== undefined) updateData.name = data.name.trim();
   if (data.role !== undefined) updateData.role = data.role.trim();
   if (data.phone !== undefined) updateData.phone = data.phone.trim();
+  if (data.hiddenInSchedule !== undefined) updateData.hidden_in_schedule = data.hiddenInSchedule;
 
   const { error } = await supabase
     .from("crews")
@@ -464,6 +465,10 @@ export async function updateCrew(
   if (error) throw new Error(`更新工班失敗: ${error.message}`);
   revalidatePath("/account/crews");
   revalidatePath("/schedule");
+}
+
+export async function toggleCrewVisibility(crewId: string, hidden: boolean) {
+  return updateCrew(crewId, { hiddenInSchedule: hidden });
 }
 
 export async function deleteCrew(crewId: string) {

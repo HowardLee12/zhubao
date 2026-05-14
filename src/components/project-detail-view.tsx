@@ -8,8 +8,7 @@ import { TradeList } from "@/components/trade-list";
 import { AddTradeForm } from "@/components/add-trade-form";
 import { PaymentList } from "@/components/payment-list";
 import { AddPaymentForm } from "@/components/add-payment-form";
-import { PhotoGrid } from "@/components/photo-grid";
-import { PhotoUpload } from "@/components/photo-upload";
+import { PhotoGallery } from "@/components/photo-gallery";
 import type {
   ProjectRow,
   TradeRow,
@@ -133,16 +132,12 @@ export function ProjectDetailView({
                   </span>
                 )}
               </div>
-              <div className="bg-surface rounded-2xl border border-warm-border p-3 space-y-3">
-                <PhotoGrid
+              <div className="bg-surface rounded-2xl border border-warm-border p-3">
+                <PhotoGallery
+                  projectId={project.id}
                   photos={photos}
                   trades={trades}
-                  projectId={project.id}
                   photoUrls={photoUrls}
-                />
-                <PhotoUpload
-                  projectId={project.id}
-                  trades={trades}
                   remaining={photoQuota.remaining}
                   allowed={photoQuota.allowed}
                 />

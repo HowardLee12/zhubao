@@ -1,4 +1,8 @@
 // Week-day helpers for the schedule grid.
+//
+// All operations are LOCAL-time-safe: we never round-trip through
+// `Date.toISOString()` (UTC) for date-only values, since that introduces
+// off-by-one errors in timezones away from UTC (e.g. Taipei UTC+8).
 
 export type WeekDay = {
   iso: string;        // "2026-05-13"
@@ -11,28 +15,47 @@ export type WeekDay = {
 
 const WEEKDAY_ZH = ["日", "一", "二", "三", "四", "五", "六"];
 
-// ISO date for `date` shifted by N days
+// Format Date → "YYYY-MM-DD" using LOCAL year/month/day (not UTC)
+function localIso(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Parse "YYYY-MM-DD" as a local-midnight Date.
+function parseIso(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// Today's local date as ISO string.
+export function todayLocalIso(): string {
+  return localIso(new Date());
+}
+
+// ISO date shifted by N days, in local calendar.
 export function shiftDays(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00`);
+  const d = parseIso(iso);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return localIso(d);
 }
 
-// Monday of the week containing `iso`. JS getDay(): 0=Sun .. 6=Sat
+// Monday of the week containing `iso`. JS getDay(): 0=Sun..6=Sat
 export function mondayOf(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  const jsDow = d.getDay(); // 0..6
-  const offset = jsDow === 0 ? -6 : 1 - jsDow; // 0 (Sun) -> -6, 1 (Mon) -> 0, 2 (Tue) -> -1, ...
+  const d = parseIso(iso);
+  const jsDow = d.getDay();
+  const offset = jsDow === 0 ? -6 : 1 - jsDow; // Sun→-6, Mon→0, Tue→-1, ...
   d.setDate(d.getDate() + offset);
-  return d.toISOString().slice(0, 10);
+  return localIso(d);
 }
 
-// Returns `count` consecutive days starting from `startIso`.
+// Returns `count` consecutive days starting from `startIso` (inclusive).
 export function weekDays(startIso: string, count = 6, todayIso?: string): WeekDay[] {
-  const today = todayIso ?? new Date().toISOString().slice(0, 10);
+  const today = todayIso ?? todayLocalIso();
   return Array.from({ length: count }, (_, i) => {
     const iso = shiftDays(startIso, i);
-    const d = new Date(`${iso}T00:00:00`);
+    const d = parseIso(iso);
     return {
       iso,
       date: d.getDate(),
@@ -44,15 +67,15 @@ export function weekDays(startIso: string, count = 6, todayIso?: string): WeekDa
   });
 }
 
-// ISO week number (rough, not strict ISO 8601 — good enough for label)
+// Approximate ISO week number — good enough for label.
 export function weekNumberOf(iso: string): number {
-  const d = new Date(`${iso}T00:00:00`);
+  const d = parseIso(iso);
   const start = new Date(d.getFullYear(), 0, 1);
   const days = Math.floor((d.getTime() - start.getTime()) / 86400000);
   return Math.ceil((days + start.getDay() + 1) / 7);
 }
 
-// `date` falls within [start, end] inclusive (end nullable -> single day)
+// `date` falls within [start, end] inclusive (end nullable → single day)
 export function dateInRange(date: string, start: string | null, end: string | null): boolean {
   if (!start) return false;
   if (!end) return date === start;

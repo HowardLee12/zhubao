@@ -81,15 +81,6 @@ export function ScheduleGrid({
   const [pending, setPending] = useState(false);
   const days = useMemo(() => weekDays(weekStart, 6, todayIso), [weekStart, todayIso]);
 
-  // Crews list + virtual "unassigned" row
-  const rows = useMemo(
-    () => [
-      { id: "__none__", name: "未指定", role: "" },
-      ...crews,
-    ],
-    [crews]
-  );
-
   // Bucket trades by (rowKey, dateIso)
   const cells = useMemo(() => {
     const map = new Map<string, ScheduleTrade[]>();
@@ -103,6 +94,39 @@ export function ScheduleGrid({
     }
     return map;
   }, [trades, days]);
+
+  // Visibility rule:
+  //   - "未指定" row: shown only if any trades land there this week
+  //   - Crew row: shown if has trades this week AND not user-hidden;
+  //               OR if user expanded "顯示已隱藏"
+  const [showHidden, setShowHidden] = useState(false);
+  const dayIsoSet = useMemo(() => new Set(days.map((d) => d.iso)), [days]);
+  const hasTrade = (rowKey: string) =>
+    Array.from(cells.keys()).some(
+      (k) => k.startsWith(`${rowKey}|`) && dayIsoSet.has(k.slice(rowKey.length + 1))
+    );
+
+  const visibleRows = useMemo(() => {
+    const rows: { id: string; name: string; role: string }[] = [];
+    const unassignedHasTrades = hasTrade("__none__");
+    if (unassignedHasTrades || showHidden) {
+      rows.push({ id: "__none__", name: "未指定", role: "" });
+    }
+    for (const c of crews) {
+      const has = hasTrade(c.id);
+      const isHidden = c.hidden_in_schedule;
+      const shouldShow = (has && !isHidden) || showHidden;
+      if (shouldShow) {
+        rows.push({ id: c.id, name: c.name, role: c.role });
+      }
+    }
+    return rows;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crews, cells, days, showHidden]);
+
+  const hiddenCount =
+    crews.filter((c) => !hasTrade(c.id) || c.hidden_in_schedule).length +
+    (hasTrade("__none__") ? 0 : 1);
 
   // Drag handlers (pointer events for both mouse and touch)
   const onPointerDown = (e: React.PointerEvent, trade: ScheduleTrade) => {
@@ -225,7 +249,7 @@ export function ScheduleGrid({
         </div>
 
         {/* Crew rows */}
-        {rows.map((crew) => (
+        {visibleRows.map((crew) => (
           <div
             key={crew.id}
             className="grid border-b border-warm-border last:border-b-0"
@@ -297,6 +321,19 @@ export function ScheduleGrid({
           </div>
         ))}
       </div>
+
+      {/* Show-hidden expander */}
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowHidden((v) => !v)}
+          className="w-full mt-2 py-2 rounded-xl border border-dashed border-warm-border-strong bg-surface-warm text-[12px] text-ink-2 font-medium"
+        >
+          {showHidden
+            ? `收合本週沒派工的工班`
+            : `顯示已隱藏 / 本週沒派工的工班 (${hiddenCount})`}
+        </button>
+      )}
 
       {/* Legend */}
       <div className="flex flex-wrap gap-2 px-1 py-2 text-[10px] text-ink-3">

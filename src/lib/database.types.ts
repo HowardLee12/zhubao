@@ -42,6 +42,7 @@ export type CrewRow = {
   name: string;
   role: string;
   phone: string;
+  hidden_in_schedule: boolean;
   created_at: string;
   updated_at: string;
 };

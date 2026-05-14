@@ -320,13 +320,24 @@ export default function QuoteDetailPage() {
         sharing={sharing}
       />
 
-      <div className="px-4 mt-2">
+      <div className="px-4 mt-2 grid grid-cols-2 gap-2">
         <Link
           href={`/quotes/${quote.id}/line-preview`}
-          className="block w-full text-center py-2.5 rounded-xl bg-surface border border-warm-border text-[13px] font-semibold text-ink-2 active:scale-[0.99] transition-transform"
+          className="block text-center py-2.5 rounded-xl bg-surface border border-warm-border text-[13px] font-semibold text-ink-2 active:scale-[0.99] transition-transform"
         >
-          👀 預覽屋主在 LINE 看到的樣子
+          👀 LINE 預覽
         </Link>
+        <a
+          href={`/api/quotes/${quote.id}/pdf`}
+          className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-surface border border-warm-border text-[13px] font-semibold text-ink-2 active:scale-[0.99] transition-transform"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          下載 PDF
+        </a>
       </div>
     </div>
   );

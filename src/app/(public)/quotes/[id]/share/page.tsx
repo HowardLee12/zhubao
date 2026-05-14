@@ -124,6 +124,20 @@ export default async function QuoteSharePage({
         <span className="text-lg font-bold text-primary">{formatCurrency(grandTotal)}</span>
       </div>
 
+      <div className="px-4 mb-3">
+        <a
+          href={`/api/quotes/${id}/pdf`}
+          className="flex items-center justify-center gap-2 w-full bg-surface border border-warm-border text-ink rounded-xl py-3 text-sm font-semibold active:scale-[0.99] transition-transform"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          下載 PDF
+        </a>
+      </div>
+
       <div className="px-4 pb-8 text-center">
         <div className="text-[11px] text-muted-foreground">
           由 Renoly 產生 · 裝修工程報價與管理工具

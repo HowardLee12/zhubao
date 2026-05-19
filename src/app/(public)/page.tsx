@@ -180,13 +180,10 @@ export default function LandingPage() {
 
           {/* Pro */}
           <div className="bg-card rounded-xl p-5 shadow-sm border-2 border-primary relative">
-            <div className="absolute -top-3 left-4 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full">
-              即將推出
-            </div>
             <div className="flex justify-between items-center mb-3 mt-1">
               <span className="text-base font-bold text-sage-800">專業版</span>
               <span className="text-lg font-extrabold text-sage-800">
-                NT$599<span className="text-xs font-normal text-sage-500">/月</span>
+                NT$399<span className="text-xs font-normal text-sage-500">/月</span>
               </span>
             </div>
             <ul className="space-y-2 text-sm text-sage-600">
@@ -200,7 +197,7 @@ export default function LandingPage() {
               </li>
               <li className="flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                無限施工照片
+                每案 500 張施工照片
               </li>
               <li className="flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>

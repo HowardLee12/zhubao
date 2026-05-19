@@ -4,10 +4,11 @@ import {
   getUserProfile,
   getUserUsage,
   getProjects,
+  effectivePlan,
   PLAN_LIMITS,
+  PRO_PRICE_MONTHLY,
 } from "@/lib/queries";
 import { LogoutButton } from "@/components/logout-button";
-import { PricingSurvey } from "@/components/pricing-survey";
 import { TopBar } from "@/components/ui/top-bar";
 import { Pill } from "@/components/ui/pill";
 
@@ -59,8 +60,13 @@ function MenuRow({
   );
 }
 
-export default async function AccountPage() {
-  const [profile, usage, projects] = await Promise.all([
+export default async function AccountPage({
+  searchParams,
+}: Readonly<{
+  searchParams: Promise<{ pay?: string }>;
+}>) {
+  const [{ pay }, profile, usage, projects] = await Promise.all([
+    searchParams,
     getUserProfile(),
     getUserUsage(),
     getProjects(),
@@ -68,10 +74,13 @@ export default async function AccountPage() {
 
   if (!profile) redirect("/dashboard");
 
-  const plan = profile.plan ?? "free";
-  const quoteLimit = PLAN_LIMITS[plan]?.quotes ?? PLAN_LIMITS.free.quotes;
-  const projectLimit = PLAN_LIMITS[plan]?.projects ?? PLAN_LIMITS.free.projects;
+  const plan = effectivePlan(profile);
+  const quoteLimit = PLAN_LIMITS[plan].quotes;
+  const projectLimit = PLAN_LIMITS[plan].projects;
   const isFreePlan = plan === "free";
+  const expiresAt = profile.plan_expires_at
+    ? new Date(profile.plan_expires_at)
+    : null;
 
   // Hours-saved estimate (rough, not stored as event log yet):
   //   per quote ~30 min saved vs. Excel
@@ -85,6 +94,17 @@ export default async function AccountPage() {
   return (
     <div className="pb-24">
       <TopBar title="帳號" subtitle="管理你的帳號與方案" />
+
+      {pay === "upgraded" && (
+        <div className="mx-4 mt-1 px-3 py-2.5 rounded-xl bg-[var(--warm-green-soft)] border border-[var(--warm-green)]/30 text-[13px] text-[var(--warm-green)] font-semibold">
+          升級成功！您現在是專業版，所有上限已解除 🎉
+        </div>
+      )}
+      {pay === "failed" && (
+        <div className="mx-4 mt-1 px-3 py-2.5 rounded-xl bg-[var(--warm-red-soft)] border border-[var(--warm-red)]/30 text-[13px] text-[var(--warm-red)]">
+          付款未完成，未扣款。可再試一次或聯絡我們。
+        </div>
+      )}
 
       {/* Profile card */}
       <div className="px-4 mt-1">
@@ -112,10 +132,15 @@ export default async function AccountPage() {
               {profile.display_name}
             </div>
             <div className="text-[11px] text-ink-3 mt-0.5">LINE 帳號登入</div>
-            <div className="mt-1.5">
+            <div className="mt-1.5 flex items-center gap-2">
               <Pill variant={isFreePlan ? "neutral" : "orange"}>
                 {PLAN_LABELS[plan] ?? plan} 方案
               </Pill>
+              {!isFreePlan && expiresAt && (
+                <span className="text-[10px] text-ink-3 font-mono">
+                  續訂至 {expiresAt.getMonth() + 1}/{expiresAt.getDate()}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -170,13 +195,59 @@ export default async function AccountPage() {
         </div>
       </div>
 
-      {/* Pricing survey for free users */}
+      {/* Upgrade CTA for free users */}
       {isFreePlan && (
         <div className="px-4 mt-3">
-          <PricingSurvey
-            userId={profile.id}
-            userName={profile.display_name ?? ""}
-          />
+          <div
+            className="rounded-2xl p-4 text-white"
+            style={{
+              background: "linear-gradient(135deg, #E2691F 0%, #A04428 100%)",
+            }}
+          >
+            <div className="text-[15px] font-bold">升級專業版</div>
+            <div className="text-[12px] opacity-85 mt-0.5">
+              解除所有上限，安心接更多案子
+            </div>
+            <div className="mt-3 space-y-1.5 text-[12px]">
+              {[
+                "無限報價單（免費版 50 份）",
+                "無限案件管理（免費版 20 件）",
+                "每案 500 張施工照片（免費版 100 張）",
+              ].map((f) => (
+                <div key={f} className="flex items-center gap-1.5">
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="shrink-0"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>{f}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex items-baseline gap-1">
+              <span className="font-mono text-2xl font-bold">
+                NT${PRO_PRICE_MONTHLY}
+              </span>
+              <span className="text-[12px] opacity-80">/ 月，可隨時取消</span>
+            </div>
+            <a
+              href="/api/ecpay/checkout"
+              className="mt-3 block w-full text-center bg-white text-orange-deep rounded-xl py-3 text-sm font-bold active:scale-[0.98] transition-transform"
+            >
+              立即升級
+            </a>
+            <div className="text-[10px] opacity-70 mt-2 text-center">
+              透過綠界 ECPay 定期定額，每月自動續訂
+            </div>
+          </div>
         </div>
       )}
 

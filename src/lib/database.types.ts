@@ -6,6 +6,8 @@ export type UserRow = {
   display_name: string;
   picture_url: string;
   plan: UserPlan;
+  plan_expires_at: string | null;
+  ecpay_trade_no: string | null;
   created_at: string;
   updated_at: string;
 };

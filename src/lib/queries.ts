@@ -3,13 +3,15 @@ import { getUserId } from "./auth";
 import {
   ProjectRow, TradeRow, PaymentRow,
   QuoteRow, QuoteSectionRow, QuoteItemRow,
-  UserRow, PhotoRow, CrewRow,
+  UserRow, PhotoRow, CrewRow, UserPlan,
 } from "./database.types";
 
 export const PLAN_LIMITS = {
   free: { quotes: 50, projects: 20, photosPerProject: 100 },
-  pro: { quotes: Infinity, projects: Infinity, photosPerProject: Infinity },
+  pro: { quotes: Infinity, projects: Infinity, photosPerProject: 500 },
 } as const;
+
+export const PRO_PRICE_MONTHLY = 399;
 
 export interface ProjectWithRelations extends ProjectRow {
   trades: TradeRow[];
@@ -220,6 +222,18 @@ export async function getUserProfile(): Promise<UserRow | null> {
   return data as UserRow;
 }
 
+// A user is effectively Pro only while their paid period is still valid.
+// If plan='pro' but plan_expires_at is in the past (ECPay stopped billing),
+// they fall back to free limits until the next successful payment.
+export function effectivePlan(
+  profile: { plan: UserPlan; plan_expires_at?: string | null } | null
+): UserPlan {
+  if (!profile) return "free";
+  if (profile.plan !== "pro") return "free";
+  if (!profile.plan_expires_at) return "pro"; // legacy/manual pro, no expiry
+  return new Date(profile.plan_expires_at) > new Date() ? "pro" : "free";
+}
+
 export interface UserUsage {
   quoteCount: number;
   projectCount: number;
@@ -257,7 +271,7 @@ export async function canCreateQuote(): Promise<boolean> {
 
   if (!profile) return false;
 
-  const limit = PLAN_LIMITS[profile.plan]?.quotes ?? PLAN_LIMITS.free.quotes;
+  const limit = PLAN_LIMITS[effectivePlan(profile)].quotes;
   return usage.quoteCount < limit;
 }
 
@@ -269,7 +283,7 @@ export async function canCreateProject(): Promise<boolean> {
 
   if (!profile) return false;
 
-  const limit = PLAN_LIMITS[profile.plan]?.projects ?? PLAN_LIMITS.free.projects;
+  const limit = PLAN_LIMITS[effectivePlan(profile)].projects;
   return usage.projectCount < limit;
 }
 
@@ -301,8 +315,7 @@ export async function canUploadPhoto(projectId: string): Promise<{ allowed: bool
     getPhotoCount(projectId),
   ]);
 
-  const plan = profile?.plan ?? "free";
-  const limit = PLAN_LIMITS[plan]?.photosPerProject ?? PLAN_LIMITS.free.photosPerProject;
+  const limit = PLAN_LIMITS[effectivePlan(profile)].photosPerProject;
 
   if (limit === Infinity) return { allowed: true, remaining: Infinity };
 

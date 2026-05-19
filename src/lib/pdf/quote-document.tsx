@@ -211,10 +211,11 @@ export function QuoteDocument({ data }: { data: QuotePDFData }) {
           const sectionTotal = section.items.reduce((s, it) => s + it.clientTotal, 0);
           return (
             <View key={`${section.name}-${sectionIdx}`} style={styles.section} wrap={false}>
+              {/* No emoji here: the bundled CJK font has no emoji glyphs,
+                  so section.icon would render as broken tofu. The orange
+                  left border already provides the visual accent. */}
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionName}>
-                  {section.icon} {section.name}
-                </Text>
+                <Text style={styles.sectionName}>{section.name}</Text>
                 <Text style={styles.sectionTotal}>{formatNT(sectionTotal)}</Text>
               </View>
               {section.items.map((item, itemIdx) => (

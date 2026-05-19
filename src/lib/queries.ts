@@ -7,7 +7,7 @@ import {
 } from "./database.types";
 
 export const PLAN_LIMITS = {
-  free: { quotes: 20, projects: Infinity, photosPerProject: 100 },
+  free: { quotes: 50, projects: 20, photosPerProject: 100 },
   pro: { quotes: Infinity, projects: Infinity, photosPerProject: Infinity },
 } as const;
 

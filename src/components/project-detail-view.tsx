@@ -50,7 +50,12 @@ export function ProjectDetailView({
   canCreateQuote: boolean;
   conflictTradeIds: string[];
 }>) {
-  const [tab, setTab] = useState<Tab>("overview");
+  // Brand-new project (nothing created yet) → land on 報價 so the template
+  // picker is the first thing the user sees, shortening the path to the
+  // dual-version pricing "aha".
+  const isBrandNew =
+    quotes.length === 0 && trades.length === 0 && payments.length === 0;
+  const [tab, setTab] = useState<Tab>(isBrandNew ? "quote" : "overview");
   const conflictSet = new Set(conflictTradeIds);
   const crewNamesById: Record<string, { name: string; role: string; phone: string }> = {};
   for (const c of crews) {

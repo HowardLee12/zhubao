@@ -4,8 +4,10 @@ import { TopBar, TopBarIconButton } from "@/components/ui/top-bar";
 import { StatCard } from "@/components/ui/stat-card";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Pill } from "@/components/ui/pill";
-import { getProjects, getUserProfile, canCreateProject } from "@/lib/queries";
+import { getProjects, getUserProfile, getUserUsage, canCreateProject } from "@/lib/queries";
 import { formatCurrencyShort, formatDateLong, greeting } from "@/lib/format";
+import { OnboardingCard } from "@/components/onboarding-card";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -15,13 +17,27 @@ function startOfMonth(d: Date): string {
 }
 
 export default async function DashboardPage() {
-  const [projects, profile, canCreate] = await Promise.all([
+  const [projects, profile, usage, canCreate] = await Promise.all([
     getProjects(),
     getUserProfile(),
+    getUserUsage(),
     canCreateProject(),
   ]);
 
   const now = new Date();
+
+  // First-run: no projects yet → focused onboarding instead of empty NT$0 noise
+  if (projects.length === 0) {
+    return (
+      <div>
+        <TopBar
+          title={`${greeting(now)}，${profile?.display_name || "工程夥伴"}`}
+          subtitle={formatDateLong(now)}
+        />
+        <OnboardingCard canCreate={canCreate} />
+      </div>
+    );
+  }
   const monthStart = startOfMonth(now);
   const allPayments = projects.flatMap((p) => p.payments);
 
@@ -90,6 +106,11 @@ export default async function DashboardPage() {
           deltaColor={paidThisMonth.length > 0 ? "success" : "default"}
         />
       </div>
+
+      {/* Not yet activated: nudge toward first quote */}
+      {usage.quoteCount === 0 && projects[0] && (
+        <OnboardingChecklist firstProjectId={projects[0].id} />
+      )}
 
       {/* Today */}
       <SectionHeader

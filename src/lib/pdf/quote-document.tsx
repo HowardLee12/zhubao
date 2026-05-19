@@ -10,17 +10,20 @@ import { Document, Page, Text, View, StyleSheet, Font } from "@react-pdf/rendere
 // Chinese glyphs, so without this the PDF would render every Chinese character
 // as a blank box.
 //
-// Source: Google Fonts repo (OFL licensed) via jsDelivr CDN.
-// First cold-start fetch is ~1s for the 7MB regular weight; warm starts reuse
-// the cached font in memory.
+// Source: @expo-google-fonts/noto-sans-tc (OFL) via jsDelivr's npm CDN.
+// NOTE: the jsDelivr *gh* proxy 403s on google/fonts (repo too large); the
+// *npm* endpoint serves the complete TTF reliably. Don't switch back to a
+// gh/ URL — it returns 403 and the PDF route 500s.
+// First cold-start fetch is ~1s for the ~6MB regular weight; warm starts
+// reuse the cached font in memory.
 Font.register({
   family: "NotoSansTC",
   fonts: [
     {
-      src: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosanstc/static/NotoSansTC-Regular.ttf",
+      src: "https://cdn.jsdelivr.net/npm/@expo-google-fonts/noto-sans-tc@0.2.3/NotoSansTC_400Regular.ttf",
     },
     {
-      src: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosanstc/static/NotoSansTC-Bold.ttf",
+      src: "https://cdn.jsdelivr.net/npm/@expo-google-fonts/noto-sans-tc@0.2.3/NotoSansTC_700Bold.ttf",
       fontWeight: "bold",
     },
   ],

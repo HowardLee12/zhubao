@@ -71,11 +71,14 @@ export default function LandingPage() {
         <h1 className="text-4xl font-extrabold mb-3 leading-tight tracking-tight">
           Renoly
         </h1>
-        <p className="text-base opacity-90 mb-2">
-          裝修小隊的接案管家
+        <p className="text-lg font-semibold opacity-95 mb-2 leading-snug">
+          一份報價，自動分成本版＋客戶版
         </p>
-        <p className="text-sm opacity-70 mb-8">
-          手機直接開，不用裝 APP
+        <p className="text-sm opacity-80 mb-1">
+          利潤自動算 · LINE 一鍵給屋主，成本自動隱藏
+        </p>
+        <p className="text-xs opacity-60 mb-8">
+          裝修小隊的接案管家 · 手機直接開，不用裝 APP
         </p>
         <a
           href={LIFF_URL}
@@ -159,22 +162,17 @@ export default function LandingPage() {
               </span>
             </div>
             <ul className="space-y-2 text-sm text-sage-600">
-              <li className="flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                無限案件管理
-              </li>
-              <li className="flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                20 張報價單
-              </li>
-              <li className="flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                100 張施工照片/案件
-              </li>
-              <li className="flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                工班排程 + 收款追蹤
-              </li>
+              {[
+                "20 個案件",
+                "50 張報價單",
+                "每案 100 張施工照片",
+                "工班排程 + 收款追蹤 + PDF 匯出",
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
+                  {f}
+                </li>
+              ))}
             </ul>
           </div>
 
@@ -187,22 +185,17 @@ export default function LandingPage() {
               </span>
             </div>
             <ul className="space-y-2 text-sm text-sage-600">
-              <li className="flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                無限報價單
-              </li>
-              <li className="flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                無限案件管理
-              </li>
-              <li className="flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                每案 500 張施工照片
-              </li>
-              <li className="flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                所有免費版功能
-              </li>
+              {[
+                "無限案件、無限報價單",
+                "每案 500 張施工照片",
+                "所有免費版功能",
+                "每月自動續訂，可隨時取消",
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
+                  {f}
+                </li>
+              ))}
             </ul>
           </div>
         </div>

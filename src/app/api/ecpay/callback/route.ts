@@ -1,3 +1,4 @@
+import { track } from "@vercel/analytics/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { verifyCallback } from "@/lib/ecpay";
 
@@ -35,6 +36,8 @@ export async function POST(req: Request) {
         plan_expires_at: expires.toISOString(),
       })
       .eq("id", userId);
+
+    void track("upgrade_success").catch(() => {});
   }
 
   // Acknowledge regardless (we've recorded what we can); ECPay needs 1|OK.

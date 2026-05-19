@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { track } from "@vercel/analytics/server";
 import { supabase } from "@/lib/supabase";
 import { SignJWT } from "jose";
 import type { UserRow } from "@/lib/database.types";
@@ -78,6 +79,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
       }
       user = created as UserRow;
+      // Funnel: a brand-new user just signed up (analytics must never break auth)
+      void track("signup").catch(() => {});
     }
 
     // Create signed JWT session token

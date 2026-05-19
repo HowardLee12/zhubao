@@ -1,6 +1,7 @@
 "use server";
 
 import { supabase, supabaseAdmin } from "./supabase";
+import { track } from "@vercel/analytics/server";
 import { revalidatePath } from "next/cache";
 import { ProjectRow, QuoteRow } from "./database.types";
 import { getUserId } from "./auth";
@@ -37,6 +38,7 @@ export async function createProject(data: {
 
   if (error) throw new Error(`Failed to create project: ${error.message}`);
 
+  void track("project_created").catch(() => {});
   revalidatePath("/");
   return project;
 }
@@ -180,6 +182,7 @@ export async function createQuoteWithSections(data: {
   // Update project total_amount
   await recalculateProjectTotal(data.projectId);
 
+  void track("quote_created").catch(() => {});
   revalidatePath("/quotes");
   revalidatePath(`/quotes/${quote.id}`);
   return { data: quote };

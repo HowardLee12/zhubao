@@ -8,6 +8,8 @@ import { QuoteVersionToggle } from "@/components/quote-version-toggle";
 import { formatCurrency, calculateClientPrice, calculateSectionTotal } from "@/lib/format";
 import { ViewMode } from "@/lib/types";
 import { v4 as uuid } from "uuid";
+import { QuoteTemplatePicker } from "@/components/quote-template-picker";
+import type { QuoteTemplate } from "@/lib/quote-templates";
 
 interface DraftItem {
   id: string;
@@ -124,6 +126,17 @@ function NewQuoteContent() {
       { id: uuid(), name, icon, items: [] },
     ]);
     setShowAddSection(false);
+  };
+
+  const applyTemplate = (t: QuoteTemplate) => {
+    setSections(
+      t.sections.map((s) => ({
+        id: uuid(),
+        name: s.name,
+        icon: s.icon,
+        items: s.items.map((item) => ({ ...item, id: uuid() })),
+      }))
+    );
   };
 
   const removeSection = (sectionId: string) => {
@@ -390,13 +403,18 @@ function NewQuoteContent() {
           </div>
         ))}
 
+        {/* Template picker — only on a fresh (non-clone) empty builder */}
+        {sections.length === 0 && !cloneFrom && (
+          <QuoteTemplatePicker onPick={applyTemplate} />
+        )}
+
         {/* Add section button */}
         {!showAddSection ? (
           <button
             onClick={() => setShowAddSection(true)}
             className="w-full py-3 border-2 border-dashed border-sage-300 rounded-xl text-sm text-sage-500 font-medium"
           >
-            + 新增工程分類
+            {sections.length === 0 ? "或自己從頭建立分類" : "+ 新增工程分類"}
           </button>
         ) : (
           <div className="bg-card rounded-xl shadow-sm p-4">

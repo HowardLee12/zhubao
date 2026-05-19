@@ -3,7 +3,7 @@
 -- ⚠️ SEQUENCING — DO NOT RUN THIS UNTIL ALL OF THE BELOW ARE TRUE:
 --   1. The code change making the server data client use service_role is
 --      DEPLOYED to production.
---   2. https://zhubao.vercel.app/api/_diag returns {"serviceRole":true}
+--   2. https://zhubao.vercel.app/api/diag returns {"serviceRole":true}
 --      (confirms production is really on the service_role key, not the
 --       anon fallback).
 --   3. The live app still works for a logged-in user.
@@ -53,4 +53,4 @@ ALTER FUNCTION public.update_updated_at() SET search_path = public, pg_temp;
 -- b) anon key is now denied — this should return [] or an error:
 --    curl 'https://cbqklkdllekholdiozue.supabase.co/rest/v1/projects?select=id' \
 --      -H "apikey: <NEXT_PUBLIC_SUPABASE_ANON_KEY>"
--- c) Remove the /api/_diag route once verified.
+-- c) Remove the /api/diag route once verified.

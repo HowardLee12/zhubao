@@ -56,7 +56,7 @@ worker ── private credentials ──> LINE API
 | SQL injection | Supabase query builder／parameterized SQL；RPC 禁 dynamic SQL；輸入 allowlist |
 | 偽造 LINE webhook | raw body HMAC-SHA256、constant-time compare、destination matching、大小限制 |
 | webhook／action replay | provider event unique key、Idempotency-Key、state machine、outbox dedupe |
-| 公開 token 暴力猜測／外洩 | 256-bit CSPRNG、只存 hash、到期／撤銷／scope、rate limit、no-referrer、log redaction |
+| 公開 token 暴力猜測／外洩 | 256-bit 不可猜 capability（CSPRNG／server-key HMAC）、只存 hash、到期／撤銷／scope、rate limit、no-referrer、log redaction |
 | 惡意檔案／圖片炸彈 | signed upload、size/type/magic-byte/dimension 驗證、quarantine、重編碼、私有 bucket |
 | SSRF | 不接受任意遠端 URL；LINE content 只用固定官方 endpoint 與 server-side message id |
 | 敏感 log／analytics 外洩 | structured allowlist log、redaction、禁錄 raw body/signed URL/PII |
@@ -249,6 +249,7 @@ CSRF_SECRET
 ```
 
 程式啟動時驗證存在、長度與格式；缺少直接 fail closed。不得提供 production default。
+`PUBLIC_TOKEN_PEPPER` 以不同 domain prefix 分別用於低熵 IP keyed hash 與 quote capability HMAC；不可送到 client、log 或 analytics。
 
 ### 8.2 LINE credential encryption
 
@@ -261,12 +262,14 @@ CSRF_SECRET
 
 ### 8.3 Public token
 
-- 使用 CSPRNG 32 bytes（256 bit），base64url without padding。
-- DB 存 `SHA-256(token + server pepper)`；明文只在建立時回一次。
+- intake capability 使用 CSPRNG 32 bytes；quote capability 以 server-only key 對 `operation + organization + quote + Idempotency-Key` 做 domain-separated HMAC-SHA256。兩者都是 256-bit base64url without padding；quote mutation replay 會得到完全相同且不可猜的 URL。
+- DB 只存 `SHA-256(token)`。quote 明文只存在 API response、URL fragment 與 browser 當次 Authorization header；不落 DB。
 - 每個 token 具 resource、scopes、expiresAt、maxUses、revokedAt。
 - quote/change order token 預設 30 日或交易 validUntil 較早者；intake form 可長期但可隨時 rotate。
-- URL 頁面設 `Referrer-Policy: no-referrer`；禁止第三方 script、analytics replay、外部圖片造成 Referer 泄漏。
-- server access log middleware 將 token path segment替換成 `[REDACTED]`。
+- URL 頁面設 `Referrer-Policy: no-referrer`，不載入第三方 script／analytics／外部圖片。
+- quote capability 放在 `/public/quotes#<capability>` fragment，API 使用固定 `/public/quotes/current` path + bearer header；HTTP request path、Problem Details 與 access log 不含 raw token。Authorization header 必須由平台／log drain 保持 redacted。
+
+M4 Pilot 的 quote token 只綁定單一 immutable version 與 `quote:read/quote:respond` scope，最長 30 日且不超過報價效期；owner／admin rotate 時會先撤銷同一 quote 的舊 token。staff route 只把 hash 交給 RPC，public route 只把 hash 交給 service-role gateway，staff browser 永遠拿不到 service-role key。原始 URL 遺失後不能從資料庫讀回，只能 rotate；相同 mutation idempotency key 的網路 retry 則可安全重建完全相同 URL。
 
 ## 9. LINE webhook 與訊息安全
 
@@ -327,11 +330,13 @@ MVP allowlist：`image/jpeg`, `image/png`, `image/webp`。HEIC 在 server pipeli
 
 - Token scope 最小化：`quote:read/quote:respond`、`change_order:read/respond`、`intake:create/upload`、`work_order:signoff`。
 - GET view 可匿名但 rate limited；respond 必須 Idempotency-Key，並鎖 active version。
-- 接受／拒絕時記錄：resource/version、token id（非明文）、display name、timestamp、IP keyed hash、user-agent family、decision event。
+- 接受／拒絕時至少記錄：resource/version、token id（非明文）、display name、timestamp、comment 與 decision event。IP keyed hash、user-agent family 是 production hardening gate，M4 Pilot 尚未送入 quote decision RPC。
 - 不把一般點擊宣稱為法定電子簽章；產品文案使用「簽認紀錄」。若客戶需要更高保證，另導入 OTP／第三方簽署。
 - 有效 token 指向 superseded version 時只顯示「已有新版，請重新開啟」，不可接受舊版。
 - Public response 不回內部 UUID、成本、internal notes、其他案件或員工資訊。
 - 防濫用：IP + token sliding window、honeypot、行為門檻 CAPTCHA、相同電話／LINE identity 建單頻率限制。
+
+公開 intake 與 M4 quote 都已有 PostgreSQL 共享時窗限制。quote gateway 先以獨立 transaction 消耗 private IP/token budget，成功後才進入會鎖 quote row 的 view/respond RPC；因此後續 404/409/429 不會回滾計數。view 為 120/IP + 60/token/10 分鐘，respond 為 10/IP + 5/token/小時，超限固定回 429。
 
 ## 12. Rate limiting
 
@@ -386,7 +391,7 @@ upgrade-insecure-requests;
 - 不使用 `script-src 'unsafe-eval'`；逐步移除 inline style 後收緊 `style-src`。
 - CORS 預設 same-origin，不設 `*`；如需獨立前端，精確 allowlist origin，credential response 不可 wildcard。
 - API state-changing method拒絕 browser simple form content types。
-- 不把 token／PII 放 URL query；public capability path 是例外且必須 redacted/no-referrer。
+- 不把 token／PII 放 URL query 或 path；quote capability 只放 fragment，再轉為 redacted Authorization bearer。其他 public capability 若仍使用 path，必須先具備平台 access-log redaction 與 no-referrer。
 
 ## 14. Logging、監控與 audit
 

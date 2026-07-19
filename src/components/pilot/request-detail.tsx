@@ -548,6 +548,7 @@ export function PilotRequestDetail({
   const isConverted = detail.status === "converted";
   const canTriage = detail.status === "new" || detail.status === "triaged";
   const canConvert = detail.status === "triaged" || detail.status === "quoting" || detail.status === "quoted";
+  const canQuote = canConvert && Boolean(detail.customerId && detail.locationId);
 
   return (
     <PilotPage>
@@ -919,6 +920,16 @@ export function PilotRequestDetail({
             <PilotButton className="w-full" disabled={busyAction} onClick={() => void runTriage()}>
               {busyAction ? "處理中…" : "分流案件"}
             </PilotButton>
+          ) : null}
+          {canConvert ? (
+            canQuote ? (
+              <Link
+                href={`/app/inbox/${detail.id}/quote`}
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-orange px-4 text-sm font-bold text-white shadow-[0_10px_25px_rgba(226,105,31,0.22)] transition hover:bg-orange-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange focus-visible:ring-offset-2"
+              >
+                建立／查看正式報價
+              </Link>
+            ) : null
           ) : null}
           {canConvert ? (
             <PilotButton

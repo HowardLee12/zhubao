@@ -21,6 +21,15 @@ function csrfInvalid(): ApiProblem {
   });
 }
 
+function configurationInvalid(): ApiProblem {
+  return new ApiProblem({
+    status: 500,
+    code: "CONFIG_INVALID",
+    title: "伺服器設定不完整",
+    detail: "NEXT_PUBLIC_APP_URL 未設定、安全性不足或無效，無法驗證要求來源。",
+  });
+}
+
 function readCookie(request: Request, name: string): string | null {
   const header = request.headers.get("cookie");
   if (!header) return null;
@@ -60,14 +69,14 @@ function constantTimeEquals(a: string, b: string): boolean {
 export function configuredAppOrigin(request: Request): string {
   const configured = process.env.NEXT_PUBLIC_APP_URL;
   const fromEnv = configured ? normalizeOrigin(configured) : null;
-  if (fromEnv) return fromEnv;
+  if (fromEnv) {
+    if (process.env.NODE_ENV === "production" && new URL(fromEnv).protocol !== "https:") {
+      throw configurationInvalid();
+    }
+    return fromEnv;
+  }
   if (process.env.NODE_ENV === "production") {
-    throw new ApiProblem({
-      status: 500,
-      code: "CONFIG_INVALID",
-      title: "伺服器設定不完整",
-      detail: "NEXT_PUBLIC_APP_URL 未設定或無效，無法驗證要求來源。",
-    });
+    throw configurationInvalid();
   }
   return new URL(request.url).origin;
 }

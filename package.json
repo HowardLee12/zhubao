@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "dev:local": "node scripts/with-local-supabase.mjs npm run dev",
+    "dev:local": "node scripts/with-local-supabase.mjs npm run dev -- --hostname 127.0.0.1 --port 3100",
     "build": "next build",
     "build:local": "node scripts/with-local-supabase.mjs npm run build",
     "start": "next start",

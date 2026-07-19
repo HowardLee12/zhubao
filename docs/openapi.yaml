@@ -2240,10 +2240,11 @@ paths:
     post:
       tags: [Quotes]
       operationId: createQuote
-      summary: Atomically create a quote and its first draft version
+      summary: Atomically create a quote and its first server-calculated draft version
       security: *employeeWriteSecurity
       parameters:
-        - $ref: "#/components/parameters/IdempotencyKeyOptional"
+        - $ref: "#/components/parameters/IfMatch"
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -2262,7 +2263,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/QuoteEnvelope"
+                $ref: "#/components/schemas/PilotQuoteWorkspaceEnvelope"
 
   /organizations/{orgId}/quotes/{id}:
     parameters:
@@ -2271,13 +2272,7 @@ paths:
     get:
       tags: [Quotes]
       operationId: getQuote
-      summary: Get a quote
-      parameters:
-        - name: include
-          in: query
-          schema:
-            type: string
-            enum: [activeVersion, latestVersion]
+      summary: Get the current staff quote workspace
       responses:
         <<: *standardErrors
         "200":
@@ -2288,7 +2283,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/QuoteEnvelope"
+                $ref: "#/components/schemas/PilotQuoteWorkspaceEnvelope"
     patch:
       tags: [Quotes]
       operationId: updateQuote
@@ -2338,7 +2333,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/QuoteVersionEnvelope"
+                $ref: "#/components/schemas/PilotQuoteWorkspaceEnvelope"
 
   /organizations/{orgId}/quote-versions/{versionId}:
     parameters:
@@ -2368,7 +2363,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateQuoteVersionRequest"
+              $ref: "#/components/schemas/QuoteVersionInput"
       responses:
         <<: *standardErrors
         "200":
@@ -2376,7 +2371,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/QuoteVersionEnvelope"
+                $ref: "#/components/schemas/PilotQuoteWorkspaceEnvelope"
 
   /organizations/{orgId}/quote-versions/{versionId}/items:
     parameters:
@@ -2474,7 +2469,8 @@ paths:
     post:
       tags: [Quotes]
       operationId: sendQuote
-      summary: Send an owner-approved quote version and enqueue its notification
+      summary: Owner/admin approves and locks the exact quote version, returning a replay-stable public URL
+      description: LINE delivery is M6; M4 returns a capability URL for the owner to copy into the existing customer conversation.
       security: *employeeWriteSecurity
       requestBody:
         required: true
@@ -2485,11 +2481,48 @@ paths:
       responses:
         <<: *standardErrors
         "200":
-          description: Quote sent; notification may remain queued.
+          description: Quote sent and one-time raw customer URL returned; only its hash is stored.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/QuoteEnvelope"
+                $ref: "#/components/schemas/PilotQuoteLinkEnvelope"
+
+  /organizations/{orgId}/quotes/{id}/actions/rotate-public-link:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+      - $ref: "#/components/parameters/ResourceId"
+      - $ref: "#/components/parameters/IfMatch"
+      - $ref: "#/components/parameters/IdempotencyKey"
+    post:
+      tags: [Quotes]
+      operationId: rotateQuotePublicLink
+      summary: Owner/admin revokes prior quote links and returns an idempotently replayable new URL
+      security: *employeeWriteSecurity
+      responses:
+        <<: *standardErrors
+        "200":
+          description: Previous links revoked and a new raw capability URL returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PilotQuoteLinkEnvelope"
+
+  /organizations/{orgId}/service-requests/{id}/quote:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+      - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [Quotes]
+      operationId: getQuoteByServiceRequest
+      summary: Reopen the single quote aggregate attached to a service request
+      responses:
+        <<: *standardErrors
+        "200":
+          description: Current staff quote workspace for the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PilotQuoteWorkspaceEnvelope"
 
   /organizations/{orgId}/quotes/{id}/actions/cancel:
     parameters:
@@ -2512,14 +2545,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/QuoteEnvelope"
 
-  /public/quotes/{token}:
-    parameters:
-      - $ref: "#/components/parameters/PublicToken"
+  /public/quotes/current:
     get:
       tags: [Quotes]
       operationId: getPublicQuote
       summary: Get the sanitized active public quote version
-      security: []
+      security:
+        - publicCapabilityBearer: []
       responses:
         <<: *standardErrors
         "200":
@@ -2529,15 +2561,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/PublicQuoteEnvelope"
 
-  /public/quotes/{token}/responses:
+  /public/quotes/current/responses:
     parameters:
-      - $ref: "#/components/parameters/PublicToken"
       - $ref: "#/components/parameters/IdempotencyKey"
     post:
       tags: [Quotes]
       operationId: respondToPublicQuote
       summary: Accept or reject the current active quote version
-      security: []
+      security:
+        - publicCapabilityBearer: []
       requestBody:
         required: true
         content:
@@ -3700,6 +3732,11 @@ components:
       scheme: bearer
       bearerFormat: short-lived service JWT
       description: Audience-restricted workload identity; never accepted by employee routes.
+    publicCapabilityBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: 256-bit opaque capability
+      description: Raw public quote capability carried only in Authorization; never in the HTTP path or logs.
 
   parameters:
     OrgId:
@@ -7340,19 +7377,19 @@ components:
           type: [string, "null"]
           format: uuid
         groupName:
-          type: [string, "null"]
-          maxLength: 100
+          type: string
+          maxLength: 120
         name:
           type: string
           minLength: 1
           maxLength: 300
         specification:
-          type: [string, "null"]
-          maxLength: 2000
+          type: string
+          maxLength: 5000
         unit:
           type: string
           minLength: 1
-          maxLength: 30
+          maxLength: 20
         quantity:
           $ref: "#/components/schemas/Quantity"
         unitCostMinor:
@@ -7378,17 +7415,17 @@ components:
           type: [string, "null"]
           format: uuid
         groupName:
-          type: [string, "null"]
-          maxLength: 100
+          type: string
+          maxLength: 120
         name:
           type: string
           maxLength: 300
         specification:
-          type: [string, "null"]
-          maxLength: 2000
+          type: string
+          maxLength: 5000
         unit:
           type: string
-          maxLength: 30
+          maxLength: 20
         quantity:
           $ref: "#/components/schemas/Quantity"
         unitCostMinor:
@@ -7422,10 +7459,13 @@ components:
             - $ref: "#/components/schemas/BusinessDate"
             - type: "null"
         customerNotes:
-          type: [string, "null"]
-          maxLength: 5000
+          type: string
+          maxLength: 10000
+        internalNotes:
+          type: string
+          maxLength: 10000
         terms:
-          type: [string, "null"]
+          type: string
           maxLength: 10000
         items:
           type: array
@@ -7433,7 +7473,7 @@ components:
           maxItems: 300
           items:
             $ref: "#/components/schemas/QuoteItemInput"
-      required: [title, validUntil, customerNotes, terms, items]
+      required: [title, validUntil, customerNotes, internalNotes, terms, items]
     QuoteVersion:
       type: object
       additionalProperties: false
@@ -7559,11 +7599,7 @@ components:
       additionalProperties: false
       properties:
         serviceRequestId:
-          type: [string, "null"]
-          format: uuid
-        projectId:
-          type: [string, "null"]
-          format: uuid
+          $ref: "#/components/schemas/Uuid"
         customerId:
           $ref: "#/components/schemas/Uuid"
         locationId:
@@ -7572,7 +7608,7 @@ components:
           $ref: "#/components/schemas/Currency"
         version:
           $ref: "#/components/schemas/QuoteVersionInput"
-      required: [serviceRequestId, projectId, customerId, locationId, currency, version]
+      required: [serviceRequestId, customerId, locationId, currency, version]
     UpdateQuoteRequest:
       type: object
       additionalProperties: false
@@ -7590,13 +7626,8 @@ components:
       additionalProperties: false
       properties:
         cloneFromVersionId:
-          type: [string, "null"]
-          format: uuid
-        version:
-          anyOf:
-            - $ref: "#/components/schemas/QuoteVersionInput"
-            - type: "null"
-      required: [cloneFromVersionId, version]
+          $ref: "#/components/schemas/Uuid"
+      required: [cloneFromVersionId]
     UpdateQuoteVersionRequest:
       type: object
       additionalProperties: false
@@ -7633,19 +7664,16 @@ components:
       properties:
         versionId:
           $ref: "#/components/schemas/Uuid"
-        channel:
-          $ref: "#/components/schemas/NotificationChannel"
-        message:
-          type: [string, "null"]
-          maxLength: 2000
-      required: [versionId, channel]
+        serviceRequestLockVersion:
+          $ref: "#/components/schemas/LockVersion"
+      required: [versionId, serviceRequestLockVersion]
     PublicMerchant:
       type: object
       additionalProperties: false
       properties:
         name:
           type: string
-          maxLength: 200
+          maxLength: 120
         phone:
           anyOf:
             - $ref: "#/components/schemas/E164Phone"
@@ -7682,8 +7710,6 @@ components:
         quoteNo:
           type: string
           maxLength: 40
-        versionId:
-          $ref: "#/components/schemas/Uuid"
         versionNo:
           type: integer
           minimum: 1
@@ -7693,6 +7719,10 @@ components:
           anyOf:
             - $ref: "#/components/schemas/BusinessDate"
             - type: "null"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
         items:
           type: array
           items:
@@ -7708,28 +7738,30 @@ components:
         currency:
           $ref: "#/components/schemas/Currency"
         customerNotes:
-          type: [string, "null"]
-          maxLength: 5000
-        terms:
-          type: [string, "null"]
+          type: string
           maxLength: 10000
-      required: [merchant, quoteNo, versionId, versionNo, status, validUntil, items, subtotalMinor, discountMinor, taxMinor, totalMinor, currency, customerNotes, terms]
+        terms:
+          type: string
+          maxLength: 10000
+        decision:
+          anyOf:
+            - $ref: "#/components/schemas/PublicQuoteDecision"
+            - type: "null"
+      required: [merchant, quoteNo, versionNo, status, validUntil, title, items, subtotalMinor, discountMinor, taxMinor, totalMinor, currency, customerNotes, terms, decision]
     PublicQuoteResponseRequest:
       type: object
       additionalProperties: false
       properties:
         decision:
           $ref: "#/components/schemas/PublicDecision"
-        versionId:
-          $ref: "#/components/schemas/Uuid"
         displayName:
           type: string
           minLength: 1
-          maxLength: 200
+          maxLength: 120
         comment:
           type: [string, "null"]
           maxLength: 2000
-      required: [decision, versionId, displayName]
+      required: [decision, displayName]
     PublicDecisionRecord:
       type: object
       additionalProperties: false
@@ -7740,8 +7772,28 @@ components:
           $ref: "#/components/schemas/Timestamp"
         displayName:
           type: string
-          maxLength: 200
-      required: [decision, recordedAt, displayName]
+          maxLength: 120
+        comment:
+          type: [string, "null"]
+          maxLength: 2000
+        replayed:
+          type: boolean
+      required: [decision, recordedAt, displayName, comment, replayed]
+    PublicQuoteDecision:
+      type: object
+      additionalProperties: false
+      properties:
+        decision:
+          $ref: "#/components/schemas/PublicDecision"
+        recordedAt:
+          $ref: "#/components/schemas/Timestamp"
+        displayName:
+          type: string
+          maxLength: 120
+        comment:
+          type: [string, "null"]
+          maxLength: 2000
+      required: [decision, recordedAt, displayName, comment]
     QuoteEnvelope:
       type: object
       additionalProperties: false
@@ -7780,6 +7832,214 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/PublicDecisionRecord"
+      required: [data]
+    PilotQuoteAggregate:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        quoteNo:
+          type: string
+          minLength: 1
+          maxLength: 40
+        serviceRequestId:
+          $ref: "#/components/schemas/Uuid"
+        customerId:
+          $ref: "#/components/schemas/Uuid"
+        locationId:
+          $ref: "#/components/schemas/Uuid"
+        status:
+          $ref: "#/components/schemas/QuoteStatus"
+        currency:
+          type: string
+          enum: [TWD]
+        latestVersionId:
+          $ref: "#/components/schemas/Uuid"
+        activeVersionId:
+          type: [string, "null"]
+          format: uuid
+        acceptedVersionId:
+          type: [string, "null"]
+          format: uuid
+        sentAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        firstViewedAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        acceptedAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        rejectedAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        rejectionReason:
+          type: [string, "null"]
+        expiresAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        lockVersion:
+          $ref: "#/components/schemas/LockVersion"
+        createdAt:
+          $ref: "#/components/schemas/Timestamp"
+        updatedAt:
+          $ref: "#/components/schemas/Timestamp"
+      required: [id, quoteNo, serviceRequestId, customerId, locationId, status, currency, latestVersionId, activeVersionId, acceptedVersionId, sentAt, firstViewedAt, acceptedAt, rejectedAt, rejectionReason, expiresAt, lockVersion, createdAt, updatedAt]
+    PilotQuoteVersion:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        quoteId:
+          $ref: "#/components/schemas/Uuid"
+        versionNo:
+          type: integer
+          minimum: 1
+        status:
+          $ref: "#/components/schemas/QuoteVersionStatus"
+        approvalStatus:
+          $ref: "#/components/schemas/QuoteApprovalStatus"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        validUntil:
+          anyOf:
+            - $ref: "#/components/schemas/BusinessDate"
+            - type: "null"
+        customerNotes:
+          type: string
+          maxLength: 10000
+        internalNotes:
+          type: string
+          maxLength: 10000
+        terms:
+          type: string
+          maxLength: 10000
+        subtotalMinor:
+          $ref: "#/components/schemas/MoneyMinor"
+        discountMinor:
+          $ref: "#/components/schemas/MoneyMinor"
+        taxMinor:
+          $ref: "#/components/schemas/MoneyMinor"
+        totalMinor:
+          $ref: "#/components/schemas/MoneyMinor"
+        items:
+          type: array
+          maxItems: 300
+          items:
+            $ref: "#/components/schemas/QuoteItem"
+        createdAt:
+          $ref: "#/components/schemas/Timestamp"
+        updatedAt:
+          $ref: "#/components/schemas/Timestamp"
+      required: [id, quoteId, versionNo, status, approvalStatus, title, validUntil, customerNotes, internalNotes, terms, subtotalMinor, discountMinor, taxMinor, totalMinor, items, createdAt, updatedAt]
+    PilotQuoteRequestSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        requestNo:
+          type: string
+          minLength: 1
+          maxLength: 40
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 160
+        status:
+          $ref: "#/components/schemas/ServiceRequestStatus"
+        lockVersion:
+          $ref: "#/components/schemas/LockVersion"
+      required: [id, requestNo, subject, status, lockVersion]
+    PilotQuoteCustomerSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        phone:
+          anyOf:
+            - $ref: "#/components/schemas/E164Phone"
+            - type: "null"
+      required: [id, name, phone]
+    PilotQuoteLocationSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        label:
+          type: string
+          minLength: 1
+          maxLength: 80
+        address:
+          type: string
+          minLength: 1
+          maxLength: 600
+      required: [id, label, address]
+    PilotQuoteWorkspace:
+      type: object
+      additionalProperties: false
+      properties:
+        quote:
+          $ref: "#/components/schemas/PilotQuoteAggregate"
+        version:
+          $ref: "#/components/schemas/PilotQuoteVersion"
+        request:
+          $ref: "#/components/schemas/PilotQuoteRequestSummary"
+        customer:
+          $ref: "#/components/schemas/PilotQuoteCustomerSummary"
+        location:
+          $ref: "#/components/schemas/PilotQuoteLocationSummary"
+        replayed:
+          type: boolean
+      required: [quote, version, request, customer, location]
+    PilotQuoteWorkspaceEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/PilotQuoteWorkspace"
+      required: [data]
+    PilotQuoteLinkResult:
+      type: object
+      additionalProperties: false
+      properties:
+        quote:
+          $ref: "#/components/schemas/PilotQuoteAggregate"
+        version:
+          $ref: "#/components/schemas/PilotQuoteVersion"
+        request:
+          $ref: "#/components/schemas/PilotQuoteRequestSummary"
+        customer:
+          $ref: "#/components/schemas/PilotQuoteCustomerSummary"
+        location:
+          $ref: "#/components/schemas/PilotQuoteLocationSummary"
+        replayed:
+          type: boolean
+        publicQuoteUrl:
+          type: string
+          format: uri
+      required: [quote, version, request, customer, location, publicQuoteUrl]
+    PilotQuoteLinkEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/PilotQuoteLinkResult"
       required: [data]
 
     ChangeOrderItemInput:

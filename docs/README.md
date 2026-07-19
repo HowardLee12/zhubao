@@ -20,6 +20,7 @@ Renoly v2 是給 2–10 人小型工程與到府服務團隊使用的 LINE-first
 | [testing-strategy.md](testing-strategy.md) | TDD、測試層級、coverage、CI 與 fixtures | 開發、QA |
 | [implementation-plan.md](implementation-plan.md) | 階段、相依性、agent 邊界與 Definition of Done | 開發、管理 |
 | [delivery-status.md](delivery-status.md) | 已交付、尚未整合、release gates 與下一輪順序 | 全體 |
+| [manual-test-m4.md](manual-test-m4.md) | 從乾淨本機 DB 驗收進件、報價、客戶回覆與轉案件 | 創辦人、QA、試點使用者 |
 
 ## 規格優先順序
 

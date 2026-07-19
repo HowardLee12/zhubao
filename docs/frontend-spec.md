@@ -394,6 +394,15 @@ owner／dispatcher 的主要新增按鈕可開啟動作面板：
 - 已撤回：客戶連結顯示已撤回，內部保留紀錄。
 - 通知失敗：報價仍是已送出；顯示補送或複製連結，不回退資料狀態。
 
+#### M4 Pilot 已實作切片
+
+- 從 `/app/inbox/[id]/quote` 建立該進件唯一的 quote aggregate；建立後 canonical URL 為 `/app/quotes/[id]`。
+- 採明確「儲存草稿」而非尚未可靠實作的自動儲存；每次寫入用 quote ETag 防止 lost update。
+- owner／admin 必須勾選已檢查價格、範圍、效期與客戶版內容，才可在同一 transaction 核准並送出；dispatcher 可編輯但不能送出。
+- 客戶版 tab 不顯示成本與內部備註；公開 API 另以 allowlist DTO 再剝除一次，不能只靠 CSS 隱藏。
+- M6 前不顯示 LINE 模板或假發送成功；送出後只產生一次可複製的真實安全連結。若遺失，owner／admin 可明確確認後 rotate，舊連結立即撤銷。
+- 接受後提供回進件轉工單／專案；拒絕後以「複製成新版草稿」建立 vNext，舊版維持唯讀。
+
 ### 8.3 追加／追減
 
 路由：/app/cases/[caseId]/change-orders/new、/app/change-orders/[id]  
@@ -744,8 +753,10 @@ technician 僅可見完成任務需要的內容，詳見第 10 節。
 
 ### 14.3 客戶報價頁
 
-路由：/public/quotes/[token]  
+路由：/public/quotes#&lt;capability&gt;
 使用者：customer
+
+Capability 放在 URL fragment，不進 server request path；頁面載入後只以 `Authorization: Bearer` 呼叫固定 public API path，避免 capability 出現在 access log／Problem Details。
 
 內容：
 
@@ -762,6 +773,8 @@ technician 僅可見完成任務需要的內容，詳見第 10 節。
 - 新版本取代：舊頁顯示已更新並導向最新有效版本。
 - 過期／撤回：禁用接受，顯示聯絡店家。
 - 送出中斷：重試前先查詢結果，避免重複確認。
+
+M4 Pilot 的接受／拒絕不要求登入或註冊，但需要確認人姓名；第一次選擇只開啟摘要 dialog，第二次按「確認送出」才寫入。現階段尚未提供 PDF、要求店家聯絡按鈕、版本自動導向或 LINE 內自動推播，這些不得在 UI 中假裝完成。
 
 ### 14.4 預約確認／改期頁
 

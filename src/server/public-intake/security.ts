@@ -22,6 +22,18 @@ export function requirePublicToken(candidate: string): string {
   return candidate;
 }
 
+export function requirePublicBearerToken(request: Request): string {
+  const authorization = request.headers.get("authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    throw publicLinkNotFound();
+  }
+  const candidate = authorization.slice("Bearer ".length);
+  if (candidate.includes(" ")) {
+    throw publicLinkNotFound();
+  }
+  return requirePublicToken(candidate);
+}
+
 export function hashPublicToken(token: string): string {
   return createHash("sha256").update(requirePublicToken(token), "utf8").digest("hex");
 }

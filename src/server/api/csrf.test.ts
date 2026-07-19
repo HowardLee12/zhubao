@@ -52,6 +52,15 @@ describe("configuredAppOrigin", () => {
       expect.objectContaining({ status: 500, code: "CONFIG_INVALID" }),
     );
   });
+
+  it("rejects an HTTP application origin in production", () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://app.renoly.tw");
+    vi.stubEnv("NODE_ENV", "production");
+    const request = new Request("https://app.renoly.tw/api/v2/organizations");
+    expect(() => configuredAppOrigin(request)).toThrow(
+      expect.objectContaining({ status: 500, code: "CONFIG_INVALID" }),
+    );
+  });
 });
 
 describe("verifyCsrf", () => {

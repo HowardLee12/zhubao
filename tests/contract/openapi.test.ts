@@ -68,9 +68,9 @@ describe("OpenAPI contract", () => {
       });
     });
 
-    expect(Object.keys(paths)).toHaveLength(121);
-    expect(operations).toHaveLength(162);
-    expect(Object.keys(schemas)).toHaveLength(287);
+    expect(Object.keys(paths)).toHaveLength(123);
+    expect(operations).toHaveLength(164);
+    expect(Object.keys(schemas)).toHaveLength(297);
   });
 
   it("keeps every internal reference resolvable", () => {
@@ -99,7 +99,7 @@ describe("OpenAPI contract", () => {
       });
     });
 
-    expect(operationIds).toHaveLength(162);
+    expect(operationIds).toHaveLength(164);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -203,5 +203,63 @@ describe("OpenAPI contract", () => {
     expect(convertProperties).not.toHaveProperty("assigneeMembershipIds");
     const preferredWindow = schemas.PreferredTimeWindow as JsonRecord;
     expect(preferredWindow.required).toEqual(["startsAt", "endsAt", "preferenceRank"]);
+  });
+
+  it("pins the implemented M4 quote workspace, secure-link and public response contracts", () => {
+    expect(isRecord(parsedDocument)).toBe(true);
+    if (!isRecord(parsedDocument)) return;
+    const paths = parsedDocument.paths as JsonRecord;
+
+    function responseRef(path: string, method: string, status: string): unknown {
+      const operation = (paths[path] as JsonRecord)[method] as JsonRecord;
+      const response = (operation.responses as JsonRecord)[status] as JsonRecord;
+      const media = (response.content as JsonRecord)["application/json"] as JsonRecord;
+      return (media.schema as JsonRecord).$ref;
+    }
+
+    function requestRef(path: string, method: string): unknown {
+      const operation = (paths[path] as JsonRecord)[method] as JsonRecord;
+      const content = (operation.requestBody as JsonRecord).content as JsonRecord;
+      const media = content["application/json"] as JsonRecord;
+      return (media.schema as JsonRecord).$ref;
+    }
+
+    expect(responseRef("/organizations/{orgId}/quotes", "post", "201")).toBe(
+      "#/components/schemas/PilotQuoteWorkspaceEnvelope",
+    );
+    expect(requestRef("/organizations/{orgId}/quotes", "post")).toBe(
+      "#/components/schemas/CreateQuoteRequest",
+    );
+    expect(responseRef("/organizations/{orgId}/quotes/{id}", "get", "200")).toBe(
+      "#/components/schemas/PilotQuoteWorkspaceEnvelope",
+    );
+    expect(requestRef("/organizations/{orgId}/quote-versions/{versionId}", "patch")).toBe(
+      "#/components/schemas/QuoteVersionInput",
+    );
+    expect(
+      responseRef("/organizations/{orgId}/quote-versions/{versionId}", "patch", "200"),
+    ).toBe("#/components/schemas/PilotQuoteWorkspaceEnvelope");
+    expect(responseRef("/organizations/{orgId}/quotes/{id}/versions", "post", "201")).toBe(
+      "#/components/schemas/PilotQuoteWorkspaceEnvelope",
+    );
+    expect(responseRef("/organizations/{orgId}/quotes/{id}/actions/send", "post", "200")).toBe(
+      "#/components/schemas/PilotQuoteLinkEnvelope",
+    );
+    expect(
+      responseRef(
+        "/organizations/{orgId}/quotes/{id}/actions/rotate-public-link",
+        "post",
+        "200",
+      ),
+    ).toBe("#/components/schemas/PilotQuoteLinkEnvelope");
+    expect(
+      responseRef("/organizations/{orgId}/service-requests/{id}/quote", "get", "200"),
+    ).toBe("#/components/schemas/PilotQuoteWorkspaceEnvelope");
+    expect(responseRef("/public/quotes/current", "get", "200")).toBe(
+      "#/components/schemas/PublicQuoteEnvelope",
+    );
+    expect(requestRef("/public/quotes/current/responses", "post")).toBe(
+      "#/components/schemas/PublicQuoteResponseRequest",
+    );
   });
 });

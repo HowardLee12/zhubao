@@ -401,6 +401,8 @@ Indexes：`(organization_id, service_catalog_id, is_active, sort_order)`；parti
 
 新增 version 後才回填 cyclic FK；migration 先建 tables，最後 `ALTER TABLE` 加 composite FK。Indexes：unique `(organization_id, quote_no)`；`(organization_id, status, updated_at desc, id desc)`；`(organization_id, customer_id, created_at desc)`。
 
+M4 Pilot 另以 unique index 保證一筆 `service_request` 最多一個 quote aggregate；修訂建立新的 `quote_versions.version_no`，而非另一個 quote。建立草稿會在同一 transaction 將 request `triaged → quoting`；送出會改為 `quoted`；拒絕會回 `quoting`；已進入 sent/viewed/rejected lifecycle 的 request 必須有 accepted quote 才能轉工單／專案。
+
 ### 6.4 `quote_versions`
 
 | 欄位 | 型別 | 說明 |
@@ -714,11 +716,14 @@ org/{organization_id}/service-requests/{request_id}/{photo_id}/original.webp
 - `list_pilot_service_request_events`
 - `list_pilot_assignable_members`
 - `transition_work_order`
-- `create_quote_with_first_version`
-- `clone_quote_version`
-- `recalculate_quote_version`
-- `send_quote_version`
-- `respond_to_quote_public`
+- `create_pilot_quote`
+- `get_pilot_quote_workspace` / `get_pilot_quote_workspace_by_request`
+- `save_pilot_quote_draft`（quote+version 與 canonical version-only overload）
+- `approve_and_send_pilot_quote`
+- `rotate_pilot_quote_public_token`
+- `clone_pilot_quote_version`
+- `consume_pilot_public_quote_rate_limit`（service-role-only；獨立 transaction 先消耗 IP/token budget）
+- `resolve_pilot_public_quote` / `respond_pilot_public_quote`（service-role-only capability gateway）
 - `send_change_order` / `respond_to_change_order_public`
 - `mark_payment_paid` / `reverse_payment`
 - `complete_work_order`

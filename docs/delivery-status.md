@@ -4,16 +4,16 @@
 
 這份文件區分「已能操作／驗證的程式」與「已定義但尚未接上真實基礎設施的合約」，避免把互動原型誤認成 production-ready SaaS。成熟度分級：`Spec → Demo → Implemented → Verified → Pilot`。
 
-## 目前驗證基線（2026-07-19 實跑，M3 交付後）
+## 目前驗證基線（2026-07-19 實跑，M4 交付後）
 
 - `npm run typecheck`：通過。
-- `npm run lint`：0 errors（3 個 v1 遺留 warnings）。
-- `npm run test:unit`：80 檔、528 tests 全綠。
-- `npm run test:sql`：8 檔、234 pgTAP tests 全綠（含 `04_pilot_intake` 49 tests；M3 `05_m3_triage` 42、`06_m3_transition_service_request` 12、`07_m3_staff_access_hardening` 56 tests：triage 綁定／內部備註／可指派角色、convert-once、模板快照、原始內容不可變、authenticated-only staff projection、跨租戶、摘要稽核與真實 customer create）。
-- `npm run test:integration`：19 tests 通過（公開進件全鏈路＋跨租戶隔離；M3 打真實 RPC 的 triage 成功/角色拒/stale version、convert 建工單＋checklist 快照、convert replay 回既有 case）。
-- `npm run test:coverage`：Statements 89.97%、Branches 81.59%、Functions 93.70%、Lines 93.36%（四項門檻皆 ≥80%）。
-- `npm run build` 與 `npm run build:local`：皆通過（含新 `/app/inbox/[id]`、`service-requests/[id]/**` action routes、`customers/**` read routes）。
-- `npm run test:e2e:local`：**10/10 全綠**（5 spec × Pixel 7／Desktop Chromium），含 pilot intake journey 與 M3 `triage-convert`（onboarding → 免註冊進件 → 開單詳情看不可變原始＋可編輯摘要 → 分流 → 轉工單 → 顯示持久化案件編號且不可再轉 → reload 仍讀回同一編號；M5 前不顯示死連結）。
+- `npm run lint`：0 errors（2 個 v1 圖片元件遺留 warnings；M4 無新增 warning）。
+- `npm run test:unit`／coverage run：98 檔、649 tests 全綠。
+- `npm run test:sql`：9 檔、310 pgTAP tests 全綠；M4 `08_m4_quotes` 76 tests 覆蓋 role/tenant、server totals、ETag、deterministic 冪等、不可變 sent version、public DTO、30 日 TTL、共享 IP/token rate limit、token rotate/revoke、接受／拒絕與 clone。
+- `npm run test:integration`：4 檔、21 tests 通過；M4 以真實 local Supabase 跑 create → save → send → public view → accept → convert，以及 reject → clone v2／跨租戶負向流程。
+- `npm run test:coverage`：Statements 88.34%、Branches 80.07%、Functions 88.50%、Lines 91.66%（四項門檻皆 ≥80%）。
+- `npm run build:local`：通過（含 `/app/inbox/[id]/quote`、`/app/quotes/[id]`、fragment-only `/public/quotes` 與固定路徑 quote API routes）。
+- `npm run test:e2e:local`：**12/12 全綠**（6 journeys × Pixel 7／Desktop Chromium）；新增真實 `quote-flow`：onboarding → 免註冊進件 → 分流 → 建草稿 → owner 人工核准 → 客戶安全連結二次確認接受 → 回進件轉工單。
 
 ## 里程碑追蹤表（M0–M8）
 
@@ -24,7 +24,7 @@
 | M1 | 員工登入、建立店家、角色與最小設定 | Verified | magic link 登入（host 一致性修復＋`next` 深連結）、onboarding、settings、rotate；staff mutation 具 CSRF 與 Idempotency-Key 全鏈路；E2E 通過 |
 | M2 | 客戶免註冊提交真實報修，老闆看到接案匣 | Verified | TS↔SQL 合約已對齊並以真實 RPC integration 測試釘住；pgTAP 60 tests；E2E（手機＋桌面）通過；照片 private bucket、冪等、限流、稽核鏈生效 |
 | M3 | 人工分流、模板快照、客戶／地址／設備確認 | Verified | 兩 completion gate 有測試佐證：原始內容保留（`original_submission` 寫入即鎖 guard trigger＋pgTAP）、同一進件只能轉一次（convert-once return-existing，integration replay＋E2E 二次轉換釘住）；接案匣 keyset 深分頁補齊；triage/convert/transition RPC＋detail/actions/customers routes＋詳情 UI 全鏈路；E2E（手機＋桌面）通過 |
-| M4 | 報價、核准、安全連結與客戶接受 | Spec／Domain partial | domain 純函式（quote-calculation/version/approval、成本剝除 DTO）已建成待接線 |
+| M4 | 報價、核准、安全連結與客戶接受 | Verified | 真實 DB/RPC/API/UI/public flow 全接線；310 pgTAP、21 integration、12 E2E；LINE 自動發送明確留 M6 |
 | M5 | 派工、技師任務、照片、檢查表與完工 | Spec／Domain partial | work-order-state domain 已建成待接線 |
 | M6 | LINE OA webhook、通知與失敗重試 | Spec／DB partial | 驗章、重送、亂序、斷線 fallback 通過 |
 | M7 | 自由訊息聚合與 AI 整理草稿 | Spec | 顯示來源／信心；AI 故障不影響進件 |
@@ -32,7 +32,7 @@
 
 關鍵里程碑：M2 完成＝第一次真的能收單；M4 完成＝可成交；M5 完成＝真實營運流程可跑完；M6 完成＝真正 LINE-first；M7 完成＝開始降低人工整理時間。
 
-## 本輪（pilot 切片 R0+M1+M2）已交付
+## Pilot 累計已交付（R0–M4）
 
 | 範圍 | 狀態 | 可驗證結果 |
 |---|---|---|
@@ -46,6 +46,8 @@
 | M3 DB 層 | Verified | `202607190001_v2_m3_triage_convert.sql`：category／staff-only internal note／immutable original submission／provenance、convert-once、triage／convert／literal similar-customer search／keyset inbox；`202607190002_v2_m3_staff_access_hardening.sql`：8 個 authenticated-only projection/mutation RPC、manager/tenant guard、summary row lock＋event、可指派 operational members、transactional customer create＋流水號＋audit；M3 pgTAP 110 tests |
 | M3 API 層 | Implemented | detail `GET`/`PATCH`（If-Match、summary-edit 存證、完整 workspace）、`actions/{triage,start-quoting,mark-quoted,decline,cancel,convert}`、`events`／`photos`、customer list/create/confirmation 與 `/members` 指派名單；staff domain route 無 service-role table query，Storage signer 僅簽 RPC 已授權 metadata；keyset 接案匣回真實 `nextCursor`；OpenAPI 以 pilot DTO 對齊實際 envelope（121 paths／162 operations／287 schemas）；19 integration tests |
 | M3 UI 層 | Implemented | `/app/inbox/[id]` 詳情：唯讀原始需求 vs 可編輯摘要、相似客戶 hint（顯示不合併）、真實建立 customer、地址/設備確認、priority/類別/負責人、triage／convert／要求補資料（本地 state + copy，送出 defer M6）／不適用／取消；併發 If-Match 412 toast＋自動 refetch；convert idempotent 顯示資料庫案件編號，M5 前不產生死連結；接案匣 keyset 翻頁 |
+| M4 DB／API 層 | Verified | `202607190003_v2_m4_quote_flow.sql`：一 request 一 quote aggregate、版本快照、DB 權威重算、atomic create/save/approve-send/rotate/reject-clone/respond、hash-only public token、30 日 TTL、獨立 transaction 的共享 IP+token limiter、accepted conversion gate；staff authenticated RPC 與 public service-role gateway 分離；OpenAPI 對齊 123 paths／164 operations／297 schemas |
+| M4 UI 層 | Verified | 進件直接建立／重開正式報價；dispatcher 存草稿、owner/admin 勾選覆核後送出；店內／客戶版切換；capability 僅在 URL fragment、固定 API 以 Authorization bearer 讀取；免註冊客戶二次確認接受／拒絕；accepted 回進件 convert、rejected clone vNext；M6 前誠實顯示需手動貼 LINE |
 
 ## 缺陷狀態（2026-07-18 晚間）
 
@@ -78,7 +80,7 @@
 - `.env.local` 為 v1 舊檔且指向 production Supabase：建議改名封存（如 `.env.v1-production.bak`）以免誤用純 `npm run dev`；因屬使用者本機檔案，未代為變更。
   - **已裁決／已處理（2026-07-18）**：`src/server/services/public-intake.ts`＋`src/schemas/service-request.ts`（含測試）確認零 production import、無獨有邏輯需保留，判定為被 `src/server/public-intake/gateway.ts` 取代的平行實作並刪除；決策記於 [ADR 0003](adr/0003-public-intake-gateway-over-repository.md)。`src/server/domain/**` 與 `src/schemas/work-order.ts` 屬 M4/M5 既定 scaffolding，保留；本輪同時把 `work-order.ts` 的 `schedule` action 對齊 domain `WORK_ORDER_ACTIONS`（新增測試）。`docs/openapi.yaml` 已補 `/organizations/{orgId}/settings`（GET/PATCH）與 `/organizations/{orgId}/public-intake-link/actions/rotate`（POST）兩條實作端點與對應 schema，contract test pin 更新為 117 paths／158 operations／253 schemas；其餘 session／organizations POST／service-requests GET／四條公開 intake 端點原本即在合約內。`.env.example` 先前標示的「零 consumer secret」實為 `docs/security.md §8.1` 列為啟動必驗的必要秘密（consumer 隨 M6／M8 milestone 才接線），故保留不刪，僅補上 `.env.local` 指向 production 的警告與 `PILOT_MAIL_SERVER_URL`。
 
-## 下一 Sprint（M4，唯一目標）
+## M4 完成證據
 
 > 讓 owner 從已分流進件建立真實報價版本，讓免註冊客戶透過安全連結接受／拒絕，接受後才能順暢轉成案件。
 
@@ -91,6 +93,22 @@
 - request 狀態與 quote event 在同一 transaction 更新；stale `If-Match` 回 412，不得 lost update。
 - 接受後 UI 顯示可轉成單次工單／專案；拒絕後仍保留舊 version，可複製成新版再送。
 - 跨 tenant、token 洩漏、成本剝除、計算、版本不可變、手機＋桌面完整 E2E 全綠。
+
+上述條件已由 M4 pgTAP、API/component tests、真實 Supabase integration 與 Pixel 7／Desktop Playwright 共同釘住。
+
+### 2026-07-19 M4 對抗式安全複核（已關閉阻擋項）
+
+獨立 agent 針對 capability、重試、公開資料與濫用面檢查後提出 1 個 High、5 個 Medium/Low；本輪全數落實到程式與測試：公開 view/respond 改為先提交共享 IP+token budget、token TTL 上限 30 日、相同 mutation key 以 HMAC 重建相同 URL、capability 從 path 移到 fragment+Authorization、production origin 強制 HTTPS、public DTO/request 移除 version UUID，並移除公開頁的 client analytics 與外部字型。平台 Authorization redaction、staging／實機與 cleanup worker 仍列在 production release gate，不冒充已完成部署驗收。
+
+## 下一 Sprint（M5，唯一目標）
+
+> 讓已接受報價轉出的工單具有可操作工作台：排程／指派、技師手機任務、到場狀態、前後照、checklist 與人工完工。
+
+- Owner／dispatcher 可在案件工作台安排時間與指派技師，不再只有案件編號。
+- Technician 只看到被指派的必要客戶／地點資料，能記錄出發、到場、暫停與完成。
+- Before／after 照片走 private Storage、MIME/size/hash/metadata 驗證與短效 signed URL。
+- 完工前由 server 驗證 checklist 與必要證據；不得靠前端隱藏按鈕取代 DB invariant。
+- M6 前任何 LINE 狀態通知仍需誠實標示未自動發送，不建立假 outbox 成功畫面。
 
 ## Release gates
 

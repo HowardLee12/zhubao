@@ -475,28 +475,27 @@ Catalog item request 金額用字串：`{"name":"分離式冷氣清洗","unit":"
 
 ## 11. Quotes
 
+M4 Pilot 已接線的 surface 如下；所有 staff response 使用 `PilotQuoteWorkspace`，同時回 quote、當前 version、request ETag、customer 與 location 摘要：
+
 | Method | Path | 角色 | 規格摘要 |
 |---|---|---|---|
-| GET/POST | `/organizations/{orgId}/quotes` | O/A/D/C/V；POST O/A/D | filter `status,customerId,projectId,updatedFrom,q`；POST 原子建 quote + v1 |
-| GET | `.../quotes/{id}` | O/A/D/C/V | `include=activeVersion,latestVersion` allowlist |
-| PATCH | `.../quotes/{id}` | O/A/D | 只改 expiresAt/cancel reason 等 aggregate fields；If-Match |
-| POST | `.../quotes/{id}/versions` | O/A/D | clone 指定 version 或空白；If-Match + Idempotency |
-| GET/PATCH | `.../quote-versions/{versionId}` | GET O/A/D/C/V；PATCH O/A/D | PATCH draft only；If-Match quote aggregate |
-| PUT | `.../quote-versions/{versionId}/items` | O/A/D | 取代 draft 全部 items；最多 300；atomic；If-Match quote |
-| POST | `.../quote-versions/{versionId}/actions/submit-approval` | O/A/D | draft 送審；If-Match quote + Idempotency |
-| POST | `.../quote-versions/{versionId}/actions/approve` | O/A | 核准固定內容；If-Match quote + Idempotency |
-| POST | `.../quote-versions/{versionId}/actions/reject-approval` | O/A | 退回並附 reason；If-Match quote + Idempotency |
-| POST | `.../quotes/{id}/actions/send` | O/A | `{versionId,channel,message?}`；Phase 1 由 owner/admin 核准並送出；Idempotency + If-Match |
-| POST | `.../quotes/{id}/actions/cancel` | O/A/D | reason；If-Match |
-| GET | `/public/quotes/{token}` | P | sanitized active version；記 first view（idempotent） |
-| POST | `/public/quotes/{token}/responses` | P | accept/reject；Idempotency-Key |
+| POST | `/organizations/{orgId}/quotes` | O/A/D | 原子建立 request 唯一 quote + v1；request If-Match + Idempotency |
+| GET | `.../quotes/{id}` | O/A/D | 取得店內 quote workspace；包含成本與內部備註 |
+| GET | `.../service-requests/{id}/quote` | O/A/D | 從進件重開其唯一 quote；沒有時 404 |
+| PATCH | `.../quote-versions/{versionId}` | O/A/D | 原子取代 draft 欄位與全部 items；最多 300；quote If-Match |
+| POST | `.../quotes/{id}/versions` | O/A/D | rejected version 複製為 vNext draft；If-Match + Idempotency |
+| POST | `.../quotes/{id}/actions/send` | O/A | `{versionId,serviceRequestLockVersion}`；人工核准、鎖版本、建 hash-only token；If-Match + Idempotency |
+| POST | `.../quotes/{id}/actions/rotate-public-link` | O/A | 撤銷舊連結並回傳新 URL；相同 Idempotency-Key replay 回完全相同 URL；If-Match |
+| GET | `/public/quotes/current` | P | `Authorization: Bearer <capability>`；sanitized active version；共享 IP+token 限流；記 first view（idempotent） |
+| POST | `/public/quotes/current/responses` | P | bearer capability；accept/reject；共享限流 + Idempotency-Key |
+
+列表、quote aggregate PATCH/cancel、獨立 item route、多人 submit/approve/reject-approval workflow 與通知 channel 是完整目標合約，尚未列入 M4 Pilot 可操作 surface。M4 的 send 不 enqueue LINE；API 回傳安全 URL，由 owner 手動貼入既有對話，M6 才接通知 outbox。
 
 Create quote：
 
 ```json
 {
   "serviceRequestId": "fcb8300e-926c-44c6-957a-cf742bdd4cdf",
-  "projectId": null,
   "customerId": "7c691bbd-26f0-41fa-8467-b7023fcb1833",
   "locationId": "359612a9-dfd2-4cf7-83dc-e172f56c2255",
   "currency": "TWD",
@@ -504,6 +503,7 @@ Create quote：
     "title": "冷氣檢查與清洗報價",
     "validUntil": "2026-07-25",
     "customerNotes": "現場若發現零件故障，另行報價確認。",
+    "internalNotes": "熟客；成本不可外流。",
     "terms": "完工後轉帳付款。",
     "items": [
       {
@@ -524,7 +524,7 @@ Create quote：
 }
 ```
 
-Client 不傳 subtotal/tax/total；server 計算。`send` 的指定 version 必須為 `approvalStatus=approved`。owner/admin 可用同一 transaction 執行 approve-and-send；dispatcher 不可繞過核准。核准後若修改品項、售價、條款或客戶可見說明，approval 立即失效並回到 `draft`，必須重新送審。
+Client 不傳 subtotal/tax/total；TypeScript domain 先驗算，PostgreSQL trigger/RPC 再以整數／numeric 權威重算。owner/admin 在同一 transaction 執行 approve-and-send；dispatcher 可存草稿但不可繞過核准。送出後 version 與 items 均不可 UPDATE/DELETE；修訂只能建立新版。
 
 Public DTO 範例：
 
@@ -536,15 +536,18 @@ Public DTO 範例：
     "versionNo": 2,
     "status": "sent",
     "validUntil": "2026-07-25",
+    "title": "冷氣檢查與清洗報價",
     "items": [
       { "name": "分離式冷氣清洗", "unit": "台", "quantity": "1.000", "unitPriceMinor": "1800", "totalMinor": "1800" }
     ],
     "subtotalMinor": "1800",
+    "discountMinor": "0",
     "taxMinor": "0",
     "totalMinor": "1800",
     "currency": "TWD",
     "customerNotes": "現場若發現零件故障，另行報價確認。",
-    "terms": "完工後轉帳付款。"
+    "terms": "完工後轉帳付款。",
+    "decision": null
   }
 }
 ```
@@ -554,13 +557,12 @@ Public DTO 範例：
 ```json
 {
   "decision": "accept",
-  "versionId": "d4ae5531-01fc-49a8-b0a8-337132bbbf69",
   "displayName": "王先生",
   "comment": "請安排週六上午"
 }
 ```
 
-只可回覆當下 active version；舊頁接受回 409 `ACTIVE_VERSION_CHANGED` 並要求重新載入。
+版本由 bearer token 綁定，client 不傳也看不到內部 version UUID。只可回覆當下 active version；舊 capability 回統一無法使用或 409 `ACTIVE_VERSION_CHANGED` 並要求重新開啟店家提供的新連結。店家取得的客戶 URL 為 `/public/quotes#<capability>`；fragment 不會進 HTTP request line，browser 再以 Authorization header 呼叫上述固定 API path。
 
 ## 12. Change orders
 

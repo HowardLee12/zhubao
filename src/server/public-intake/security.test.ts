@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   hashClientIp,
   hashPublicToken,
+  requirePublicBearerToken,
   requirePublicToken,
   resolveClientIp,
 } from "./security";
@@ -27,6 +28,25 @@ describe("public intake capability security", () => {
       expect.objectContaining({ status: 404, code: "PUBLIC_LINK_NOT_FOUND" }),
     );
   });
+
+  it("reads a capability from an Authorization bearer header without putting it in the URL", () => {
+    const request = new Request("https://renoly.test/api/v2/public/quotes/current", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(requirePublicBearerToken(request)).toBe(token);
+  });
+
+  it.each([null, "", "Basic abc", "Bearer short", `bearer ${token}`, `Bearer ${token} extra`])(
+    "hides a malformed public Authorization header %s behind not-found",
+    (authorization) => {
+      const request = new Request("https://renoly.test/api/v2/public/quotes/current", {
+        headers: authorization ? { authorization } : {},
+      });
+      expect(() => requirePublicBearerToken(request)).toThrow(
+        expect.objectContaining({ status: 404, code: "PUBLIC_LINK_NOT_FOUND" }),
+      );
+    },
+  );
 
   it("selects the untrusted hop nearest the trusted proxy, ignoring client-forged left entries", () => {
     // A client-forged left-most entry (attacker-controlled) must NOT be chosen.

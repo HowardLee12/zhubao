@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>築報 — 社群對比圖</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    background: #f0f0f0;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 60px;
+  }
+  h1 {
+    font-size: 20px;
+    color: #666;
+    margin-bottom: -20px;
+  }
+
+  /* ===== Card Container ===== */
+  .card {
+    width: 1080px;
+    background: white;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  }
+
+  /* ===== Top Banner ===== */
+  .card-header {
+    background: linear-gradient(135deg, #5C6B55 0%, #3D4A37 100%);
+    padding: 32px 48px;
+    text-align: center;
+  }
+  .card-header .pain {
+    font-size: 32px;
+    font-weight: 800;
+    color: white;
+    margin-bottom: 8px;
+  }
+  .card-header .sub {
+    font-size: 18px;
+    color: rgba(255,255,255,0.7);
+  }
+
+  /* ===== Before / After Split ===== */
+  .split {
+    display: flex;
+  }
+  .side {
+    flex: 1;
+    padding: 40px;
+  }
+  .side.before {
+    background: #fafafa;
+    border-right: 2px dashed #ddd;
+  }
+  .side.after {
+    background: #f7faf6;
+  }
+  .side-label {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 20px;
+  }
+  .before .side-label {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+  .after .side-label {
+    background: #dcfce7;
+    color: #16a34a;
+  }
+
+  /* ===== Fake Excel (Before) ===== */
+  .excel {
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    overflow: hidden;
+    font-size: 12px;
+  }
+  .excel-toolbar {
+    background: #217346;
+    color: white;
+    padding: 6px 12px;
+    font-size: 11px;
+    display: flex;
+    gap: 16px;
+  }
+  .excel table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .excel th {
+    background: #e8e8e8;
+    border: 1px solid #ccc;
+    padding: 4px 8px;
+    font-weight: 600;
+    font-size: 11px;
+    color: #444;
+  }
+  .excel td {
+    border: 1px solid #ddd;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: #333;
+  }
+  .excel .highlight-danger {
+    background: #fff3f3;
+    color: #dc2626;
+    font-weight: 600;
+  }
+  .excel .row-num {
+    background: #f0f0f0;
+    color: #888;
+    text-align: center;
+    width: 28px;
+    font-size: 10px;
+  }
+
+  .annotation {
+    position: relative;
+    display: inline-block;
+  }
+  .anno-arrow {
+    color: #dc2626;
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .anno-arrow::before {
+    content: "↑";
+    font-size: 16px;
+  }
+
+  /* ===== App Mock (After) ===== */
+  .phone-frame {
+    width: 280px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 20px;
+    border: 2px solid #e0e0e0;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .phone-status {
+    background: #5C6B55;
+    color: white;
+    padding: 8px 16px;
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .phone-header {
+    background: #5C6B55;
+    color: white;
+    padding: 12px 16px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .phone-body {
+    padding: 12px;
+  }
+  .app-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: #f8faf7;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+  .app-row .label { color: #555; }
+  .app-row .value { font-weight: 700; color: #333; }
+  .app-row .cost { font-size: 11px; color: #999; }
+  .app-row .client { font-weight: 700; color: #5C6B55; }
+  .app-row .profit {
+    font-size: 11px;
+    color: #16a34a;
+    background: #dcfce7;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .app-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tag-green { background: #dcfce7; color: #16a34a; }
+  .tag-blue { background: #dbeafe; color: #2563eb; }
+
+  /* ===== LINE Chat Mock ===== */
+  .line-chat {
+    background: #8CAAD6;
+    border-radius: 16px;
+    padding: 16px;
+    max-width: 320px;
+  }
+  .line-chat-header {
+    background: #6B8DB8;
+    margin: -16px -16px 12px;
+    padding: 12px 16px;
+    border-radius: 16px 16px 0 0;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .bubble {
+    max-width: 220px;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 8px;
+  }
+  .bubble-left {
+    background: white;
+    color: #333;
+    border-bottom-left-radius: 4px;
+    margin-right: auto;
+  }
+  .bubble-right {
+    background: #A8D86E;
+    color: #333;
+    border-bottom-right-radius: 4px;
+    margin-left: auto;
+  }
+  .bubble-time {
+    font-size: 10px;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 8px;
+  }
+  .bubble-row {
+    display: flex;
+    flex-direction: column;
+  }
+  .bubble-row.right { align-items: flex-end; }
+  .bubble-row.left { align-items: flex-start; }
+
+  /* ===== Whiteboard Mock ===== */
+  .whiteboard {
+    background: white;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    padding: 20px;
+    font-family: "Noto Sans TC", cursive, sans-serif;
+    position: relative;
+  }
+  .wb-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #333;
+    text-decoration: underline;
+    text-decoration-color: #dc2626;
+  }
+  .wb-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: #555;
+  }
+  .wb-date {
+    background: #fff9db;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .wb-cross {
+    text-decoration: line-through;
+    color: #999;
+  }
+  .wb-handwrite {
+    color: #dc2626;
+    font-style: italic;
+    font-size: 12px;
+  }
+  .wb-sticker {
+    position: absolute;
+    top: -8px;
+    right: 12px;
+    background: #fee2e2;
+    color: #dc2626;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    transform: rotate(3deg);
+  }
+
+  /* ===== Schedule App Mock ===== */
+  .sch-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #f8faf7;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .sch-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .sch-dot.green { background: #16a34a; }
+  .sch-dot.yellow { background: #eab308; }
+  .sch-dot.gray { background: #ccc; }
+  .sch-info { flex: 1; }
+  .sch-name { font-weight: 700; color: #333; }
+  .sch-date { font-size: 11px; color: #888; }
+  .sch-conflict {
+    background: #fef3c7;
+    color: #d97706;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+
+  /* ===== Payment App Mock ===== */
+  .pay-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: #f8faf7;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .pay-info {}
+  .pay-name { font-weight: 600; color: #333; }
+  .pay-amount { font-size: 11px; color: #888; }
+  .pay-status {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .pay-paid { background: #dcfce7; color: #16a34a; }
+  .pay-pending { background: #fef3c7; color: #d97706; }
+  .pay-overdue { background: #fee2e2; color: #dc2626; }
+
+  /* ===== Bottom CTA ===== */
+  .card-footer {
+    padding: 28px 48px;
+    text-align: center;
+    background: #f8faf7;
+    border-top: 1px solid #eee;
+  }
+  .card-footer .cta {
+    font-size: 20px;
+    font-weight: 700;
+    color: #3D4A37;
+    margin-bottom: 8px;
+  }
+  .card-footer .url {
+    font-size: 14px;
+    color: #888;
+  }
+  .card-footer .brand {
+    display: inline-block;
+    background: #5C6B55;
+    color: white;
+    padding: 6px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 700;
+    margin-top: 12px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== IMAGE 1: 報價單 ==================== -->
+<h1>圖一：報價單對比 (1080x1080 建議截圖範圍)</h1>
+<div class="card">
+  <div class="card-header">
+    <div class="pain">報價單做兩份，還怕傳錯版本？</div>
+    <div class="sub">成本版、客戶版手動切換，算錯利潤不是第一次了...</div>
+  </div>
+  <div class="split">
+    <!-- Before -->
+    <div class="side before">
+      <span class="side-label">現在的做法</span>
+      <div class="excel">
+        <div class="excel-toolbar">
+          <span>報價單_王先生_v3_最終版(2).xlsx</span>
+        </div>
+        <table>
+          <tr>
+            <th></th><th>項目</th><th>單價</th><th>成本</th><th>數量</th><th>報客價</th>
+          </tr>
+          <tr>
+            <td class="row-num">1</td>
+            <td>拆除-牆面</td>
+            <td>$2,800</td>
+            <td class="highlight-danger">$2,200</td>
+            <td>3</td>
+            <td>$8,400</td>
+          </tr>
+          <tr>
+            <td class="row-num">2</td>
+            <td>水電-配管</td>
+            <td>$4,500</td>
+            <td class="highlight-danger">$3,800</td>
+            <td>1</td>
+            <td>$4,500</td>
+          </tr>
+          <tr>
+            <td class="row-num">3</td>
+            <td>泥作-浴室</td>
+            <td>$18,000</td>
+            <td class="highlight-danger">$15,000</td>
+            <td>1</td>
+            <td>$18,000</td>
+          </tr>
+          <tr>
+            <td class="row-num">4</td>
+            <td>油漆-全室</td>
+            <td>$12,000</td>
+            <td class="highlight-danger">$9,500</td>
+            <td>1</td>
+            <td>$12,000</td>
+          </tr>
+        </table>
+      </div>
+      <div class="anno-arrow" style="margin-top:12px;">成本欄忘記刪，直接傳給屋主</div>
+      <div style="margin-top:16px; background:#fff9db; border-radius:8px; padding:12px; font-size:12px; color:#92400e;">
+        <div style="font-weight:700; margin-bottom:4px;">每次報價要做的事：</div>
+        <div>1. Excel 填成本價</div>
+        <div>2. 複製一份，手動刪成本欄</div>
+        <div>3. 重新算利潤（拿計算機）</div>
+        <div>4. 存成 PDF 傳給屋主</div>
+        <div style="color:#dc2626; font-weight:600; margin-top:4px;">5. 祈禱沒傳錯版本 🤞</div>
+      </div>
+    </div>
+
+    <!-- After -->
+    <div class="side after">
+      <span class="side-label">用築報</span>
+      <div class="phone-frame">
+        <div class="phone-header">
+          報價單 — 王先生陽明山
+          <div style="font-size:11px; font-weight:400; opacity:0.7; margin-top:2px;">
+            <span class="app-tag tag-green" style="color:white; background:rgba(255,255,255,0.2);">客戶版</span>
+            成本版一鍵切換
+          </div>
+        </div>
+        <div class="phone-body">
+          <div style="font-size:11px; color:#888; margin-bottom:8px;">拆除工程</div>
+          <div class="app-row">
+            <div>
+              <div class="label">牆面拆除 x3</div>
+              <div class="cost">成本 $2,200</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="client">$8,400</div>
+              <span class="profit">+27%</span>
+            </div>
+          </div>
+          <div style="font-size:11px; color:#888; margin-bottom:8px; margin-top:4px;">水電工程</div>
+          <div class="app-row">
+            <div>
+              <div class="label">配管工程 x1</div>
+              <div class="cost">成本 $3,800</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="client">$4,500</div>
+              <span class="profit">+18%</span>
+            </div>
+          </div>
+          <div style="font-size:11px; color:#888; margin-bottom:8px; margin-top:4px;">泥作工程</div>
+          <div class="app-row">
+            <div>
+              <div class="label">浴室泥作 x1</div>
+              <div class="cost">成本 $15,000</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="client">$18,000</div>
+              <span class="profit">+20%</span>
+            </div>
+          </div>
+          <div style="border-top:1px solid #eee; padding-top:10px; margin-top:8px; display:flex; justify-content:space-between; font-size:13px;">
+            <span style="color:#888;">總利潤</span>
+            <span style="color:#16a34a; font-weight:700;">$5,300 (17%)</span>
+          </div>
+          <div style="margin-top:10px; background:#5C6B55; color:white; text-align:center; padding:10px; border-radius:10px; font-size:13px; font-weight:600;">
+            LINE 分享給屋主（自動隱藏成本）
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:16px; text-align:center; font-size:13px; color:#5C6B55; font-weight:600;">
+        填一次，自動算兩版<br>
+        <span style="font-weight:400; color:#888; font-size:12px;">分享時成本自動隱藏，不怕傳錯</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-footer">
+    <div class="cta">築報工程管理 — 報價不再怕傳錯</div>
+    <span class="brand">免費試用</span>
+  </div>
+</div>
+
+<!-- ==================== IMAGE 2: 收款追蹤 ==================== -->
+<h1>圖二：收款追蹤對比</h1>
+<div class="card">
+  <div class="card-header">
+    <div class="pain">尾款收了沒？翻 LINE 找半天</div>
+    <div class="sub">每個案子分好幾期，哪筆收了哪筆沒收，記在腦裡遲早出事</div>
+  </div>
+  <div class="split">
+    <!-- Before -->
+    <div class="side before">
+      <span class="side-label">現在的做法</span>
+      <div class="line-chat">
+        <div class="line-chat-header">王太太 — 信義區案</div>
+        <div class="bubble-row left">
+          <div class="bubble bubble-left">老闆，上次說的第二期款我已經轉了喔</div>
+          <div class="bubble-time" style="color:rgba(0,0,0,0.4);">3/8 14:22</div>
+        </div>
+        <div class="bubble-row right">
+          <div class="bubble bubble-right">好的收到！</div>
+          <div class="bubble-time" style="color:rgba(0,0,0,0.4);">3/8 18:45</div>
+        </div>
+        <div class="bubble-row left">
+          <div class="bubble bubble-left">那第三期什麼時候要付？金額多少？</div>
+          <div class="bubble-time" style="color:rgba(0,0,0,0.4);">3/15 09:10</div>
+        </div>
+        <div class="bubble-row right">
+          <div class="bubble bubble-right">我查一下喔</div>
+          <div class="bubble-time" style="color:rgba(0,0,0,0.4);">3/15 12:30</div>
+        </div>
+        <div class="bubble-row right">
+          <div class="bubble bubble-right" style="background:#ffda91;">（翻報價單中...）</div>
+        </div>
+      </div>
+      <div style="margin-top:16px; background:#fff9db; border-radius:8px; padding:12px; font-size:12px; color:#92400e;">
+        <div style="font-weight:700; margin-bottom:4px;">常見狀況：</div>
+        <div>- 屋主問進度，要翻 LINE 紀錄找</div>
+        <div>- 三個案子同時跑，搞混哪筆已收</div>
+        <div>- 尾款拖了兩週才發現沒催</div>
+        <div style="color:#dc2626; font-weight:600; margin-top:4px;">- 年底對帳對到頭痛</div>
+      </div>
+    </div>
+
+    <!-- After -->
+    <div class="side after">
+      <span class="side-label">用築報</span>
+      <div class="phone-frame">
+        <div class="phone-header">收款追蹤</div>
+        <div class="phone-body">
+          <div style="font-size:12px; font-weight:600; color:#555; margin-bottom:8px;">王太太 — 信義區</div>
+          <div class="pay-item">
+            <div class="pay-info">
+              <div class="pay-name">簽約金 (30%)</div>
+              <div class="pay-amount">$150,000</div>
+            </div>
+            <span class="pay-status pay-paid">已收款</span>
+          </div>
+          <div class="pay-item">
+            <div class="pay-info">
+              <div class="pay-name">二期款 (30%)</div>
+              <div class="pay-amount">$150,000</div>
+            </div>
+            <span class="pay-status pay-paid">已收款</span>
+          </div>
+          <div class="pay-item">
+            <div class="pay-info">
+              <div class="pay-name">三期款 (20%)</div>
+              <div class="pay-amount">$100,000</div>
+            </div>
+            <span class="pay-status pay-overdue">已到期</span>
+          </div>
+          <div class="pay-item">
+            <div class="pay-info">
+              <div class="pay-name">尾款 (20%)</div>
+              <div class="pay-amount">$100,000</div>
+            </div>
+            <span class="pay-status pay-pending">待收</span>
+          </div>
+          <div style="border-top:1px solid #eee; padding-top:10px; margin-top:4px;">
+            <div style="display:flex; justify-content:space-between; font-size:12px;">
+              <span style="color:#888;">已收</span>
+              <span style="color:#16a34a; font-weight:700;">$300,000 / $500,000</span>
+            </div>
+            <div style="background:#e5e7eb; border-radius:8px; height:6px; margin-top:6px;">
+              <div style="background:#16a34a; border-radius:8px; height:6px; width:60%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:16px; text-align:center; font-size:13px; color:#5C6B55; font-weight:600;">
+        每筆收款一目瞭然<br>
+        <span style="font-weight:400; color:#888; font-size:12px;">到期自動提醒，不用再翻 LINE</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-footer">
+    <div class="cta">築報工程管理 — 收款不再漏追</div>
+    <span class="brand">免費試用</span>
+  </div>
+</div>
+
+<!-- ==================== IMAGE 3: 工班排程 ==================== -->
+<h1>圖三：工班排程對比</h1>
+<div class="card">
+  <div class="card-header">
+    <div class="pain">工班撞期，到現場才知道？</div>
+    <div class="sub">同一天排了兩組人，手寫排程改到面目全非</div>
+  </div>
+  <div class="split">
+    <!-- Before -->
+    <div class="side before">
+      <span class="side-label">現在的做法</span>
+      <div class="whiteboard">
+        <div class="wb-sticker">改了3次！</div>
+        <div class="wb-title">3月排程</div>
+        <div class="wb-row">
+          <span class="wb-date">3/10-3/12</span>
+          <span>拆除 — 阿明師</span>
+        </div>
+        <div class="wb-row wb-cross">
+          <span class="wb-date">3/13-3/15</span>
+          <span>水電 — 小陳</span>
+        </div>
+        <div class="wb-row">
+          <span class="wb-handwrite">→ 改 3/16-3/18（小陳那幾天有別的案）</span>
+        </div>
+        <div class="wb-row">
+          <span class="wb-date">3/14-3/16</span>
+          <span>泥作 — 張師傅</span>
+        </div>
+        <div class="wb-row wb-cross">
+          <span class="wb-date">3/18-3/20</span>
+          <span>油漆 — 老李</span>
+        </div>
+        <div class="wb-row">
+          <span class="wb-handwrite">→ 等泥作完再說</span>
+        </div>
+        <div class="wb-row" style="margin-top:8px;">
+          <span class="wb-date">3/15</span>
+          <span style="color:#dc2626; font-weight:600;">泥作跟水電撞了！！</span>
+        </div>
+      </div>
+      <div style="margin-top:16px; background:#fff9db; border-radius:8px; padding:12px; font-size:12px; color:#92400e;">
+        <div style="font-weight:700; margin-bottom:4px;">常見狀況：</div>
+        <div>- 白板/筆記本改到看不懂</div>
+        <div>- 師傅臨時有事，整個排程要重排</div>
+        <div>- 兩個案子的工班撞期沒發現</div>
+        <div style="color:#dc2626; font-weight:600; margin-top:4px;">- 到現場才發現沒人來</div>
+      </div>
+    </div>
+
+    <!-- After -->
+    <div class="side after">
+      <span class="side-label">用築報</span>
+      <div class="phone-frame">
+        <div class="phone-header">工班排程</div>
+        <div class="phone-body">
+          <div class="sch-item">
+            <span class="sch-dot green"></span>
+            <div class="sch-info">
+              <div class="sch-name">拆除 — 阿明師</div>
+              <div class="sch-date">3/10 - 3/12 ・王太太案</div>
+            </div>
+            <span class="app-tag tag-green">完成</span>
+          </div>
+          <div class="sch-item">
+            <span class="sch-dot yellow"></span>
+            <div class="sch-info">
+              <div class="sch-name">水電 — 小陳</div>
+              <div class="sch-date">3/13 - 3/15 ・王太太案</div>
+            </div>
+            <span class="app-tag tag-blue">進行中</span>
+          </div>
+          <div class="sch-item" style="border:2px solid #f59e0b;">
+            <span class="sch-dot yellow"></span>
+            <div class="sch-info">
+              <div class="sch-name">泥作 — 張師傅</div>
+              <div class="sch-date">3/14 - 3/16 ・王太太案</div>
+            </div>
+            <span class="sch-conflict">衝突!</span>
+          </div>
+          <div class="sch-item">
+            <span class="sch-dot gray"></span>
+            <div class="sch-info">
+              <div class="sch-name">油漆 — 老李</div>
+              <div class="sch-date">3/18 - 3/20 ・王太太案</div>
+            </div>
+            <span class="app-tag" style="background:#f0f0f0; color:#888;">待排</span>
+          </div>
+          <div style="border-top:1px solid #eee; padding-top:8px; margin-top:4px;">
+            <div style="background:#fef3c7; border-radius:8px; padding:8px 10px; font-size:11px; color:#d97706; display:flex; align-items:center; gap:6px;">
+              <span style="font-size:16px;">&#9888;</span>
+              <span><b>小陳</b>和<b>張師傅</b>在 3/14-3/15 撞期</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:16px; text-align:center; font-size:13px; color:#5C6B55; font-weight:600;">
+        撞期自動偵測，一眼看出問題<br>
+        <span style="font-weight:400; color:#888; font-size:12px;">點一下就能調整，不用重抄排程</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-footer">
+    <div class="cta">築報工程管理 — 排程不再撞車</div>
+    <span class="brand">免費試用</span>
+  </div>
+</div>
+
+</body>
+</html>

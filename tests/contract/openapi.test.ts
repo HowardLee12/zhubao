@@ -70,7 +70,7 @@ describe("OpenAPI contract", () => {
 
     expect(Object.keys(paths)).toHaveLength(123);
     expect(operations).toHaveLength(164);
-    expect(Object.keys(schemas)).toHaveLength(297);
+    expect(Object.keys(schemas)).toHaveLength(307);
   });
 
   it("keeps every internal reference resolvable", () => {
@@ -261,5 +261,120 @@ describe("OpenAPI contract", () => {
     expect(requestRef("/public/quotes/current/responses", "post")).toBe(
       "#/components/schemas/PublicQuoteResponseRequest",
     );
+  });
+
+  it("pins the implemented M5 work-order detail, mutation and assignment contracts", () => {
+    expect(isRecord(parsedDocument)).toBe(true);
+    if (!isRecord(parsedDocument)) return;
+    const paths = parsedDocument.paths as JsonRecord;
+    const components = parsedDocument.components as JsonRecord;
+    const schemas = components.schemas as JsonRecord;
+
+    function responseRef(path: string, method: string, status: string): unknown {
+      const operation = (paths[path] as JsonRecord)[method] as JsonRecord;
+      const response = (operation.responses as JsonRecord)[status] as JsonRecord;
+      const media = (response.content as JsonRecord)["application/json"] as JsonRecord;
+      return (media.schema as JsonRecord).$ref;
+    }
+
+    function requestRef(path: string, method: string): unknown {
+      const operation = (paths[path] as JsonRecord)[method] as JsonRecord;
+      const content = (operation.requestBody as JsonRecord).content as JsonRecord;
+      const media = content["application/json"] as JsonRecord;
+      return (media.schema as JsonRecord).$ref;
+    }
+
+    // Create and get return the full detail projection, not the list summary.
+    expect(responseRef("/organizations/{orgId}/work-orders", "post", "201")).toBe(
+      "#/components/schemas/WorkOrderDetailEnvelope",
+    );
+    expect(responseRef("/organizations/{orgId}/work-orders/{id}", "get", "200")).toBe(
+      "#/components/schemas/WorkOrderDetailEnvelope",
+    );
+
+    // Schedule and transition carry the honest not-sent notification envelope.
+    expect(
+      responseRef("/organizations/{orgId}/work-orders/{id}/actions/schedule", "post", "200"),
+    ).toBe("#/components/schemas/WorkOrderMutationEnvelope");
+    expect(
+      responseRef(
+        "/organizations/{orgId}/work-orders/{id}/actions/transition",
+        "post",
+        "200",
+      ),
+    ).toBe("#/components/schemas/WorkOrderMutationEnvelope");
+    const mutationEnvelope = schemas.WorkOrderMutationEnvelope as JsonRecord;
+    expect(mutationEnvelope.required).toEqual(["data", "notification"]);
+    const mutationNotification = schemas.WorkOrderMutationNotification as JsonRecord;
+    expect(mutationNotification.required).toEqual(["status", "reason"]);
+    expect((schemas.MutationNotificationStatus as JsonRecord).enum).toEqual(["not_sent"]);
+
+    // The detail projection drops the never-emitted actualStartAt and carries the
+    // nested roster, checklists and photos.
+    const detail = schemas.WorkOrderDetail as JsonRecord;
+    const detailProps = detail.properties as JsonRecord;
+    expect(detailProps).not.toHaveProperty("actualStartAt");
+    expect(detailProps).toHaveProperty("assignments");
+    expect(detailProps).toHaveProperty("checklists");
+    expect(detailProps).toHaveProperty("photos");
+    expect(detailProps).toHaveProperty("organizationId");
+
+    // Schedule request: occurredAt required, assignments objects (not id array).
+    expect(requestRef("/organizations/{orgId}/work-orders/{id}/actions/schedule", "post")).toBe(
+      "#/components/schemas/ScheduleWorkOrderRequest",
+    );
+    const scheduleRequest = schemas.ScheduleWorkOrderRequest as JsonRecord;
+    expect(scheduleRequest.required).toEqual([
+      "scheduledStartAt",
+      "scheduledEndAt",
+      "occurredAt",
+      "assignments",
+    ]);
+    const scheduleProps = scheduleRequest.properties as JsonRecord;
+    expect(scheduleProps).not.toHaveProperty("assignmentIds");
+    expect((scheduleProps.assignments as JsonRecord).minItems).toBe(1);
+    expect((scheduleProps.assignments as JsonRecord).maxItems).toBe(20);
+
+    // Conflict probe: ScheduleConflict carries workOrderNo; the result drops
+    // hasConflicts to follow the RPC projection.
+    expect(requestRef("/organizations/{orgId}/schedule/conflict-check", "post")).toBe(
+      "#/components/schemas/CheckScheduleConflictsRequest",
+    );
+    expect(responseRef("/organizations/{orgId}/schedule/conflict-check", "post", "200")).toBe(
+      "#/components/schemas/ScheduleConflictEnvelope",
+    );
+    expect((schemas.ScheduleConflict as JsonRecord).required).toEqual([
+      "membershipId",
+      "workOrderId",
+      "workOrderNo",
+      "startsAt",
+      "endsAt",
+    ]);
+    expect((schemas.ScheduleConflictResult as JsonRecord).required).toEqual(["conflicts"]);
+
+    // Assignment resource mirrors assignmentDtoSchema; cancel requires a reason.
+    expect((schemas.Assignment as JsonRecord).required).toEqual([
+      "id",
+      "organizationId",
+      "workOrderId",
+      "membershipId",
+      "duty",
+      "status",
+      "assignedAt",
+      "acceptedAt",
+      "declinedAt",
+      "checkedInAt",
+      "completedAt",
+      "cancelledAt",
+      "declineReason",
+      "lockVersion",
+    ]);
+    expect(requestRef("/organizations/{orgId}/assignments/{assignmentId}", "delete")).toBe(
+      "#/components/schemas/CancelAssignmentRequest",
+    );
+    expect((schemas.CancelAssignmentRequest as JsonRecord).required).toEqual(["reason"]);
+    expect(
+      responseRef("/organizations/{orgId}/assignments/{assignmentId}", "delete", "200"),
+    ).toBe("#/components/schemas/AssignmentEnvelope");
   });
 });

@@ -308,6 +308,25 @@ values (
   true, true, 1, '2026-01-05 00:00:00+00', '2026-01-05 00:00:00+00'
 );
 
+-- M5 fixture: an unscheduled draft work order so the dispatcher scheduling and
+-- assignment flows have a deterministic starting point (lock_version = 1, no
+-- assignments, no checklists). Kept isolated in the 8206 id range so the shared
+-- scheduled work order 82000000..0001 above and the 8205 range used by the M5
+-- pgTAP suite both stay untouched.
+insert into public.work_orders (
+  id, organization_id, work_order_no, customer_id, location_id,
+  asset_id, title, description, internal_notes, status,
+  created_at, updated_at, created_by, updated_by
+)
+values (
+  '82060000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001',
+  'W-2026-0002', '40000000-0000-4000-8000-000000000001',
+  '50000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000001',
+  '次臥冷氣清洗（待排程）', '尚未排程的示範工單', '只有店內可見的成本備註', 'draft',
+  '2026-01-06 00:00:00+00', '2026-01-06 00:00:00+00',
+  '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002'
+);
+
 insert into public.quotes (
   id, organization_id, quote_no, service_request_id, customer_id, location_id,
   status, latest_version_id, currency, created_at, updated_at, created_by, updated_by

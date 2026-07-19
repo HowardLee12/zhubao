@@ -368,11 +368,12 @@ describe("PilotRequestDetail", () => {
       ),
     );
     expect(await screen.findByText("WO-202607-000001")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /前往案件/ })).not.toBeInTheDocument();
-    expect(screen.getByText(/案件工作台.*下一個里程碑/)).toBeInTheDocument();
+    // M5: the converted state now links to the real work-order workspace.
+    const link = screen.getByRole("link", { name: "前往工單工作台" });
+    expect(link).toHaveAttribute("href", "/app/work-orders/wo-1");
   });
 
-  it("disables convert and does not invent a case link when already converted on load", async () => {
+  it("links to the work-order workspace and disables convert when already converted on load", async () => {
     api.fetchServiceRequestDetail.mockResolvedValue(
       baseDetail({
         status: "converted",
@@ -385,8 +386,8 @@ describe("PilotRequestDetail", () => {
     );
     renderDetail();
 
-    expect(await screen.findByText(/案件工作台.*下一個里程碑/)).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /前往案件/ })).not.toBeInTheDocument();
+    const link = await screen.findByRole("link", { name: "前往工單工作台" });
+    expect(link).toHaveAttribute("href", "/app/work-orders/wo-9");
     expect(screen.queryByRole("button", { name: "轉換為案件" })).not.toBeInTheDocument();
   });
 

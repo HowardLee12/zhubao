@@ -610,9 +610,18 @@ export function PilotRequestDetail({
             {convertedCaseNo ? (
               <p className="mt-1 font-mono text-sm font-bold text-ink-2">{convertedCaseNo}</p>
             ) : null}
-            <p className="mt-3 rounded-xl border border-warm-border bg-white/70 px-3 py-2 text-xs leading-5 text-ink-3">
-              案件工作台會在下一個里程碑開放；目前轉換結果已確實寫入資料庫。
-            </p>
+            {detail.convertedWorkOrderId ? (
+              <Link
+                href={`/app/work-orders/${detail.convertedWorkOrderId}`}
+                className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-orange px-4 text-sm font-bold text-white shadow-[0_10px_25px_rgba(226,105,31,0.22)] transition hover:bg-orange-deep"
+              >
+                前往工單工作台
+              </Link>
+            ) : (
+              <p className="mt-3 rounded-xl border border-warm-border bg-white/70 px-3 py-2 text-xs leading-5 text-ink-3">
+                轉換結果已確實寫入資料庫；工單連結整理中，請稍後重新整理。
+              </p>
+            )}
           </PilotCard>
         </div>
       ) : null}

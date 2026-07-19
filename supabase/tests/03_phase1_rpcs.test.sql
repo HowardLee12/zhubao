@@ -193,7 +193,7 @@ select is(
    where organization_id = '20000000-0000-4000-8000-000000000001'
      and aggregate_type = 'work_order'
      and aggregate_id = '82000000-0000-4000-8000-000000000001'),
-  5::bigint,
+  6::bigint,
   'work-order audit chain advances monotonically across backdated and current events'
 );
 select ok(

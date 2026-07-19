@@ -1427,7 +1427,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/WorkOrderEnvelope"
+                $ref: "#/components/schemas/WorkOrderDetailEnvelope"
 
   /organizations/{orgId}/work-orders/{id}:
     parameters:
@@ -1447,7 +1447,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/WorkOrderEnvelope"
+                $ref: "#/components/schemas/WorkOrderDetailEnvelope"
     patch:
       tags: [Work orders]
       operationId: updateWorkOrder
@@ -1471,7 +1471,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/WorkOrderEnvelope"
+                $ref: "#/components/schemas/WorkOrderDetailEnvelope"
 
   /organizations/{orgId}/work-orders/{id}/actions/schedule:
     parameters:
@@ -1496,7 +1496,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/WorkOrderEnvelope"
+                $ref: "#/components/schemas/WorkOrderMutationEnvelope"
 
   /organizations/{orgId}/work-orders/{id}/actions/transition:
     parameters:
@@ -1523,7 +1523,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/WorkOrderEnvelope"
+                $ref: "#/components/schemas/WorkOrderMutationEnvelope"
 
   /organizations/{orgId}/work-orders/{id}/assignments:
     parameters:
@@ -1595,10 +1595,23 @@ paths:
       security: *employeeWriteSecurity
       parameters:
         - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelAssignmentRequest"
       responses:
         <<: *standardErrors
-        "204":
-          $ref: "#/components/responses/NoContent"
+        "200":
+          description: Assignment cancelled; the cancelled assignment is returned.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentEnvelope"
 
   /organizations/{orgId}/assignments/{assignmentId}/actions/respond:
     parameters:
@@ -1656,7 +1669,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/WorkOrderListEnvelope"
 
-  /organizations/{orgId}/schedule/conflicts:check:
+  /organizations/{orgId}/schedule/conflict-check:
     parameters:
       - $ref: "#/components/parameters/OrgId"
     post:
@@ -6323,9 +6336,134 @@ components:
       items:
         $ref: "#/components/schemas/StatusCount"
 
+    WorkOrderDetailAssignment:
+      type: object
+      additionalProperties: false
+      description: Assignment roster entry as projected onto the work-order detail.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        membershipId:
+          $ref: "#/components/schemas/Uuid"
+        memberName:
+          type: [string, "null"]
+        duty:
+          type: string
+        status:
+          type: string
+        assignedAt:
+          type: [string, "null"]
+        acceptedAt:
+          type: [string, "null"]
+        declinedAt:
+          type: [string, "null"]
+        checkedInAt:
+          type: [string, "null"]
+        completedAt:
+          type: [string, "null"]
+        cancelledAt:
+          type: [string, "null"]
+        declineReason:
+          type: [string, "null"]
+        lockVersion:
+          type: integer
+      required: [id, membershipId, memberName, duty, status, assignedAt, acceptedAt, declinedAt, checkedInAt, completedAt, cancelledAt, declineReason, lockVersion]
+    WorkOrderDetailChecklistItem:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        label:
+          type: string
+        responseType:
+          type: string
+        isRequired:
+          type: boolean
+        evidenceRequired:
+          type: boolean
+        options:
+          description: Opaque option payload; shape depends on responseType.
+        response:
+          description: Opaque recorded response; shape depends on responseType.
+        completedAt:
+          type: [string, "null"]
+        completedByMembershipId:
+          type: [string, "null"]
+          format: uuid
+        sortOrder:
+          type: integer
+      required: [id, label, responseType, isRequired, evidenceRequired, options, response, completedAt, completedByMembershipId, sortOrder]
+    WorkOrderDetailChecklist:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        name:
+          type: string
+        status:
+          type: string
+        completedAt:
+          type: [string, "null"]
+        completedByMembershipId:
+          type: [string, "null"]
+          format: uuid
+        lockVersion:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkOrderDetailChecklistItem"
+      required: [id, name, status, completedAt, completedByMembershipId, lockVersion, items]
+    WorkOrderDetailPhoto:
+      type: object
+      additionalProperties: false
+      description: >-
+        Photo projection. storagePath is emitted empty to clients; photo bytes are
+        read only through the authorized signed-URL route.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        category:
+          type: string
+        status:
+          type: string
+        checklistItemId:
+          type: [string, "null"]
+          format: uuid
+        storagePath:
+          type: string
+        mimeType:
+          type: string
+        byteSize:
+          type: [integer, "null"]
+        width:
+          type: [integer, "null"]
+        height:
+          type: [integer, "null"]
+        sha256:
+          type: [string, "null"]
+        caption:
+          type: [string, "null"]
+        capturedAt:
+          type: [string, "null"]
+        uploadedByMembershipId:
+          type: [string, "null"]
+          format: uuid
+        readyAt:
+          type: [string, "null"]
+        lockVersion:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, category, status, checklistItemId, storagePath, mimeType, byteSize, width, height, sha256, caption, capturedAt, uploadedByMembershipId, readyAt, lockVersion, createdAt]
     WorkOrder:
       type: object
       additionalProperties: false
+      description: >-
+        Work-order list summary returned by the collection and schedule list
+        endpoints. The single-resource detail projection is WorkOrderDetail.
       properties:
         id:
           $ref: "#/components/schemas/Uuid"
@@ -6364,10 +6502,6 @@ components:
           anyOf:
             - $ref: "#/components/schemas/Timestamp"
             - type: "null"
-        actualStartAt:
-          anyOf:
-            - $ref: "#/components/schemas/Timestamp"
-            - type: "null"
         completedAt:
           anyOf:
             - $ref: "#/components/schemas/Timestamp"
@@ -6384,7 +6518,93 @@ components:
           $ref: "#/components/schemas/Timestamp"
         updatedAt:
           $ref: "#/components/schemas/Timestamp"
-      required: [id, workOrderNo, projectId, serviceRequestId, customerId, locationId, assetId, title, description, status, priority, scheduledStartAt, scheduledEndAt, actualStartAt, completedAt, customerNotes, technicianNotes, lockVersion, createdAt, updatedAt]
+      required: [id, workOrderNo, projectId, serviceRequestId, customerId, locationId, assetId, title, description, status, priority, scheduledStartAt, scheduledEndAt, completedAt, customerNotes, technicianNotes, lockVersion, createdAt, updatedAt]
+    WorkOrderDetail:
+      type: object
+      additionalProperties: false
+      description: >-
+        Full work-order detail projection returned by create, get, schedule,
+        transition and force-complete. Includes the nested assignment roster,
+        checklist snapshots and photo projections.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        organizationId:
+          $ref: "#/components/schemas/Uuid"
+        workOrderNo:
+          type: string
+        projectId:
+          type: [string, "null"]
+          format: uuid
+        serviceRequestId:
+          type: [string, "null"]
+          format: uuid
+        customerId:
+          $ref: "#/components/schemas/Uuid"
+        locationId:
+          $ref: "#/components/schemas/Uuid"
+        assetId:
+          type: [string, "null"]
+          format: uuid
+        title:
+          type: string
+        description:
+          type: [string, "null"]
+        customerNotes:
+          type: [string, "null"]
+        technicianNotes:
+          type: [string, "null"]
+        internalNotes:
+          type: [string, "null"]
+        completionSummary:
+          type: [string, "null"]
+        priority:
+          type: string
+        status:
+          type: string
+        scheduledStartAt:
+          type: [string, "null"]
+        scheduledEndAt:
+          type: [string, "null"]
+        dispatchedAt:
+          type: [string, "null"]
+        enRouteAt:
+          type: [string, "null"]
+        onSiteAt:
+          type: [string, "null"]
+        pausedAt:
+          type: [string, "null"]
+        completedAt:
+          type: [string, "null"]
+        cancelledAt:
+          type: [string, "null"]
+        cancellationReason:
+          type: [string, "null"]
+        requiresCustomerSignoff:
+          type: boolean
+        customerSignedAt:
+          type: [string, "null"]
+        lockVersion:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkOrderDetailAssignment"
+        checklists:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkOrderDetailChecklist"
+        photos:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkOrderDetailPhoto"
+        replayed:
+          type: boolean
+      required: [id, organizationId, workOrderNo, projectId, serviceRequestId, customerId, locationId, assetId, title, description, customerNotes, technicianNotes, internalNotes, completionSummary, priority, status, scheduledStartAt, scheduledEndAt, dispatchedAt, enRouteAt, onSiteAt, pausedAt, completedAt, cancelledAt, cancellationReason, requiresCustomerSignoff, customerSignedAt, lockVersion, createdAt, updatedAt, assignments, checklists, photos]
     CreateWorkOrderRequest:
       type: object
       additionalProperties: false
@@ -6446,6 +6666,15 @@ components:
         technicianNotes:
           type: [string, "null"]
           maxLength: 5000
+    ScheduleAssignmentInput:
+      type: object
+      additionalProperties: false
+      properties:
+        membershipId:
+          $ref: "#/components/schemas/Uuid"
+        duty:
+          $ref: "#/components/schemas/AssignmentDuty"
+      required: [membershipId]
     ScheduleWorkOrderRequest:
       type: object
       additionalProperties: false
@@ -6454,16 +6683,19 @@ components:
           $ref: "#/components/schemas/Timestamp"
         scheduledEndAt:
           $ref: "#/components/schemas/Timestamp"
-        assignmentIds:
+        occurredAt:
+          $ref: "#/components/schemas/Timestamp"
+        assignments:
           type: array
-          uniqueItems: true
+          minItems: 1
           maxItems: 20
           items:
-            $ref: "#/components/schemas/Uuid"
+            $ref: "#/components/schemas/ScheduleAssignmentInput"
         conflictOverrideReason:
           type: [string, "null"]
-          maxLength: 1000
-      required: [scheduledStartAt, scheduledEndAt, assignmentIds, conflictOverrideReason]
+          minLength: 1
+          maxLength: 2000
+      required: [scheduledStartAt, scheduledEndAt, occurredAt, assignments]
     TransitionWorkOrderRequest:
       oneOf:
         - type: object
@@ -6536,13 +6768,43 @@ components:
           required: [action, occurredAt, reason]
       discriminator:
         propertyName: action
-    WorkOrderEnvelope:
+    WorkOrderDetailEnvelope:
       type: object
       additionalProperties: false
       properties:
         data:
-          $ref: "#/components/schemas/WorkOrder"
+          $ref: "#/components/schemas/WorkOrderDetail"
       required: [data]
+    MutationNotificationStatus:
+      type: string
+      description: >-
+        Honest customer/technician notification status for M5 mutation responses.
+        LINE delivery is deferred to M6, so scheduling, dispatch and completion
+        never send a message and always report not_sent.
+      enum: [not_sent]
+    WorkOrderMutationNotification:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          $ref: "#/components/schemas/MutationNotificationStatus"
+        reason:
+          type: string
+          description: Machine-readable reason the notification was not sent.
+          maxLength: 200
+      required: [status, reason]
+    WorkOrderMutationEnvelope:
+      type: object
+      additionalProperties: false
+      description: >-
+        Work-order mutation response. Carries the updated detail plus the honest
+        notification status, so the UI never implies a customer message was sent.
+      properties:
+        data:
+          $ref: "#/components/schemas/WorkOrderDetail"
+        notification:
+          $ref: "#/components/schemas/WorkOrderMutationNotification"
+      required: [data, notification]
     WorkOrderListEnvelope:
       type: object
       additionalProperties: false
@@ -6558,31 +6820,37 @@ components:
     Assignment:
       type: object
       additionalProperties: false
+      description: Assignment resource returned by create, update, cancel and respond.
       properties:
         id:
+          $ref: "#/components/schemas/Uuid"
+        organizationId:
           $ref: "#/components/schemas/Uuid"
         workOrderId:
           $ref: "#/components/schemas/Uuid"
         membershipId:
           $ref: "#/components/schemas/Uuid"
         duty:
-          $ref: "#/components/schemas/AssignmentDuty"
+          type: string
         status:
-          $ref: "#/components/schemas/AssignmentStatus"
+          type: string
         assignedAt:
-          $ref: "#/components/schemas/Timestamp"
-        respondedAt:
-          anyOf:
-            - $ref: "#/components/schemas/Timestamp"
-            - type: "null"
-        responseNote:
           type: [string, "null"]
-          maxLength: 1000
-        createdAt:
-          $ref: "#/components/schemas/Timestamp"
-        updatedAt:
-          $ref: "#/components/schemas/Timestamp"
-      required: [id, workOrderId, membershipId, duty, status, assignedAt, respondedAt, responseNote, createdAt, updatedAt]
+        acceptedAt:
+          type: [string, "null"]
+        declinedAt:
+          type: [string, "null"]
+        checkedInAt:
+          type: [string, "null"]
+        completedAt:
+          type: [string, "null"]
+        cancelledAt:
+          type: [string, "null"]
+        declineReason:
+          type: [string, "null"]
+        lockVersion:
+          type: integer
+      required: [id, organizationId, workOrderId, membershipId, duty, status, assignedAt, acceptedAt, declinedAt, checkedInAt, completedAt, cancelledAt, declineReason, lockVersion]
     CreateAssignmentRequest:
       type: object
       additionalProperties: false
@@ -6599,6 +6867,16 @@ components:
         duty:
           $ref: "#/components/schemas/AssignmentDuty"
       required: [duty]
+    CancelAssignmentRequest:
+      type: object
+      additionalProperties: false
+      description: Reason is mandatory and carried in the body because DELETE has no natural payload.
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 2000
+      required: [reason]
     RespondAssignmentRequest:
       type: object
       additionalProperties: false
@@ -6655,23 +6933,22 @@ components:
           $ref: "#/components/schemas/Uuid"
         workOrderId:
           $ref: "#/components/schemas/Uuid"
+        workOrderNo:
+          type: string
         startsAt:
-          $ref: "#/components/schemas/Timestamp"
+          type: [string, "null"]
         endsAt:
-          $ref: "#/components/schemas/Timestamp"
-      required: [membershipId, workOrderId, startsAt, endsAt]
+          type: [string, "null"]
+      required: [membershipId, workOrderId, workOrderNo, startsAt, endsAt]
     ScheduleConflictResult:
       type: object
       additionalProperties: false
       properties:
-        hasConflicts:
-          type: boolean
         conflicts:
           type: array
-          maxItems: 100
           items:
             $ref: "#/components/schemas/ScheduleConflict"
-      required: [hasConflicts, conflicts]
+      required: [conflicts]
     ScheduleConflictEnvelope:
       type: object
       additionalProperties: false

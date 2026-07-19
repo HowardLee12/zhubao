@@ -356,14 +356,14 @@ Public create 額外要求 CAPTCHA／risk token（連續濫用時必填）、hon
 |---|---|---|---|
 | GET/POST | `/organizations/{orgId}/work-orders` | O/A/D/V/T*；POST O/A/D | filter `status,assigneeId,projectId,customerId,assetId,scheduledFrom,scheduledTo,priority,q` |
 | GET/PATCH | `.../work-orders/{id}` | GET O/A/D/V/T*；PATCH O/A/D/T* | T 只能 assigned 且只可改現場備註／完工摘要；PATCH 不改 status/schedule；If-Match |
-| POST | `.../work-orders/{id}/actions/schedule` | O/A/D | 時段與 assignments；可 `conflictOverrideReason`；If-Match |
-| POST | `.../work-orders/{id}/actions/transition` | O/A/D/T* | action allowlist；Idempotency + If-Match |
+| POST | `.../work-orders/{id}/actions/schedule` | O/A/D | 時段與 `assignments[{membershipId,duty?}]`（1..20）＋必填 `occurredAt`；可 `conflictOverrideReason`；If-Match；回 `{data, notification}` |
+| POST | `.../work-orders/{id}/actions/transition` | O/A/D/T* | action allowlist；Idempotency + If-Match；回 `{data, notification}` |
 | GET/POST | `.../work-orders/{id}/assignments` | O/A/D/T* read；write O/A/D | POST Idempotency |
 | PATCH | `.../assignments/{assignmentId}` | O/A/D | duty；If-Match |
 | POST | `.../assignments/{id}/actions/respond` | T 本人 | `{decision:"accept"|"decline",reason?}`；Idempotency |
-| DELETE | `.../assignments/{id}` | O/A/D | 實際轉 cancelled；If-Match parent |
+| DELETE | `.../assignments/{id}` | O/A/D | body 必填 `{reason}`；實際轉 cancelled 並回該 assignment；If-Match |
 | GET | `/organizations/{orgId}/schedule` | O/A/D/V/T* | filter 時間必填、最大 31 日；T 僅自己 |
-| POST | `/organizations/{orgId}/schedule/conflicts:check` | O/A/D | 批次候選時段，最多 50 筆 |
+| POST | `/organizations/{orgId}/schedule/conflict-check` | O/A/D | 批次候選時段，最多 50 筆；回 `{data:{conflicts}}` |
 
 Create work order：
 
@@ -396,7 +396,9 @@ Transition：
 
 Action allowlist：`dispatch/enRoute/arrive/pause/resume/complete/cancel/reopen`。server 依 action、目前 status 與角色決定 next state，client 不傳目標 `status`。`occurredAt` 不得晚於現在 5 分鐘；早於 24 小時時僅 O/A 可帶 `overrideReason` 補登，且最久只能回溯 30 天。超出硬邊界回 `OCCURRED_AT_OUT_OF_RANGE`，不可覆寫。
 
-排程衝突預設回 409：
+`schedule` 與 `transition`（以及 force-complete）成功回應為 `{ "data": <workOrder detail>, "notification": { "status": "not_sent", "reason": "line_delivery_deferred_to_m6" } }`。M5 尚未送出 LINE 通知，envelope 誠實標示 `not_sent`，UI 不得暗示已發送。
+
+排程衝突預設回 409（每筆含 `workOrderNo`）：
 
 ```json
 {
@@ -406,12 +408,15 @@ Action allowlist：`dispatch/enRoute/arrive/pause/resume/complete/cancel/reopen`
     {
       "membershipId": "39796c68-3cd0-4aea-a8eb-b95f062e70c8",
       "workOrderId": "9931f1ce-707f-4bf5-a938-e0160f65b1e5",
+      "workOrderNo": "WO-2026-0007",
       "startsAt": "2026-07-18T01:30:00Z",
       "endsAt": "2026-07-18T03:30:00Z"
     }
   ]
 }
 ```
+
+`conflict-check`（非變更操作，但因 body 帶候選名單而做 CSRF 保護）回 `{ "data": { "conflicts": [ … ] } }`，每筆 conflict 與 409 相同欄位；沒有 `hasConflicts` 旗標，呼叫端以陣列長度判斷。
 
 ## 9. Checklists、photos、events
 

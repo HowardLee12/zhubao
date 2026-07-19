@@ -268,8 +268,9 @@ test("owner triages and converts an intake exactly once", async ({
     await expect(caseNumber).toBeVisible();
     const persistedCaseNumber = (await caseNumber.textContent())?.trim();
     expect(persistedCaseNumber).toBeTruthy();
-    await expect(page.getByText(/案件工作台.*下一個里程碑/)).toBeVisible();
-    await expect(page.getByRole("link", { name: "前往案件" })).toHaveCount(0);
+    // M5: the converted state now links straight into the real work-order
+    // workspace instead of a dead-end "next milestone" note.
+    await expect(page.getByRole("link", { name: "前往工單工作台" })).toBeVisible();
     await expect(page.getByRole("button", { name: "轉換為案件" })).toHaveCount(0);
 
     // Second convert attempt: reload the detail; it must still be the same case,
@@ -279,7 +280,7 @@ test("owner triages and converts an intake exactly once", async ({
     await expect(
       page.getByText("這筆進件已建立案件，無法再次轉換。"),
     ).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("link", { name: "前往案件" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "前往工單工作台" })).toBeVisible();
     await expect(page.getByText(persistedCaseNumber ?? "__missing__", { exact: true })).toBeVisible();
     await expect(page.getByLabel("內部備註")).toHaveValue("E2E 已電話確認現場狀況");
     await expect(page.getByRole("button", { name: "轉換為案件" })).toHaveCount(0);

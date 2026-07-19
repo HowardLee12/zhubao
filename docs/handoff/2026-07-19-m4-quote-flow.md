@@ -4,10 +4,10 @@
 
 ## TL;DR
 
-- **M0–M4 已交付並全綠**。M4（真實報價：草稿 → owner 核准 → 客戶免註冊接受/拒絕 → 接受後轉工單）是本輪重點。
-- **git HEAD**：`53cd0fd feat: complete real M3 triage and conversion flow`（此 commit 實際同時含 M3 全部 + 我方 workflow 產出）。
-- **M4 尚未 commit**：報價流程的檔案全在工作區（未進 git），已一手驗證全綠，可直接測試。
-- branch：`feat/v2-pilot-r0-m1-m2`。**未 push**。
+- **M0–M4 已交付、測試並 commit**。使用者已手動測過 M4 報價流程，回報「基本都沒問題」。
+- **git HEAD**：`f62dc93 feat: M4 real quote flow`（M4 已由我方 commit）。上一個 `53cd0fd` 是 Codex commit 的 M3（含我方 M3 workflow 產出）。
+- 工作區乾淨。branch：`feat/v2-pilot-r0-m1-m2`。**未 push**。
+- **進行中**：M5（派工/技師任務/照片/checklist/完工）規劃 workflow 已啟動。
 
 ## 目前驗證基線（2026-07-19 一手實跑）
 

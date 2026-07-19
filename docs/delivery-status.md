@@ -4,16 +4,18 @@
 
 這份文件區分「已能操作／驗證的程式」與「已定義但尚未接上真實基礎設施的合約」，避免把互動原型誤認成 production-ready SaaS。成熟度分級：`Spec → Demo → Implemented → Verified → Pilot`。
 
-## 目前驗證基線（2026-07-19 實跑，M4 交付後）
+## 目前驗證基線（2026-07-19 實跑，M5 交付後）
+
+> 註：以下計數為 M5 三軌（domain/RPC、routes、UI）與本輪 review 修復合流當下的最佳估計；全部軌道落地後會再統一重跑，屆時以最終 run 為準。coverage 門檻正在補齊中。
 
 - `npm run typecheck`：通過。
-- `npm run lint`：0 errors（2 個 v1 圖片元件遺留 warnings；M4 無新增 warning）。
-- `npm run test:unit`／coverage run：98 檔、649 tests 全綠。
-- `npm run test:sql`：9 檔、310 pgTAP tests 全綠；M4 `08_m4_quotes` 76 tests 覆蓋 role/tenant、server totals、ETag、deterministic 冪等、不可變 sent version、public DTO、30 日 TTL、共享 IP/token rate limit、token rotate/revoke、接受／拒絕與 clone。
-- `npm run test:integration`：4 檔、21 tests 通過；M4 以真實 local Supabase 跑 create → save → send → public view → accept → convert，以及 reject → clone v2／跨租戶負向流程。
-- `npm run test:coverage`：Statements 88.34%、Branches 80.07%、Functions 88.50%、Lines 91.66%（四項門檻皆 ≥80%）。
-- `npm run build:local`：通過（含 `/app/inbox/[id]/quote`、`/app/quotes/[id]`、fragment-only `/public/quotes` 與固定路徑 quote API routes）。
-- `npm run test:e2e:local`：**12/12 全綠**（6 journeys × Pixel 7／Desktop Chromium）；新增真實 `quote-flow`：onboarding → 免註冊進件 → 分流 → 建草稿 → owner 人工核准 → 客戶安全連結二次確認接受 → 回進件轉工單。
+- `npm run lint`：0 errors（2 個 v1 圖片元件遺留 warnings；M5 無新增 warning）。
+- `npm run test:unit`：約 791 tests 全綠（本輪合流估計；含 M5 派工／技師任務／照片／checklist／完工路由與元件測試，及本輪新增 schedule board keyset 分頁測試）。
+- `npm run test:sql`：10 檔、377 pgTAP tests 全綠；M5 `09_m5_work_order_ops` 覆蓋 create/schedule/assign/respond/cancel、one-active-lead 分區索引（本輪修正為以全新成員觸發，確實命中 `assignments_one_active_lead`）、技師可見性與內部備註剝除、checklist／照片完工 gate、force-complete owner gate 與 distinct event、快照凍結與跨租戶 404。
+- `npm run test:integration`：約 26 tests 通過（M4 21 + M5 真實 Supabase 派工→技師→照片→完工流程）。
+- `npm run test:coverage`：門檻補齊中（全部軌道落地後重測，維持四項 ≥80% 與租戶隔離／權限／金額／狀態轉移可達分支 100%）。
+- `npm run build:local`：通過。
+- `npm run test:e2e:local`：6 journeys（Pixel 7／Desktop Chromium）；M5 新增 dispatcher 排程／指派與技師到場→拍照→完工旅程。
 
 ## 里程碑追蹤表（M0–M8）
 
@@ -25,7 +27,7 @@
 | M2 | 客戶免註冊提交真實報修，老闆看到接案匣 | Verified | TS↔SQL 合約已對齊並以真實 RPC integration 測試釘住；pgTAP 60 tests；E2E（手機＋桌面）通過；照片 private bucket、冪等、限流、稽核鏈生效 |
 | M3 | 人工分流、模板快照、客戶／地址／設備確認 | Verified | 兩 completion gate 有測試佐證：原始內容保留（`original_submission` 寫入即鎖 guard trigger＋pgTAP）、同一進件只能轉一次（convert-once return-existing，integration replay＋E2E 二次轉換釘住）；接案匣 keyset 深分頁補齊；triage/convert/transition RPC＋detail/actions/customers routes＋詳情 UI 全鏈路；E2E（手機＋桌面）通過 |
 | M4 | 報價、核准、安全連結與客戶接受 | Verified | 真實 DB/RPC/API/UI/public flow 全接線；310 pgTAP、21 integration、12 E2E；LINE 自動發送明確留 M6 |
-| M5 | 派工、技師任務、照片、檢查表與完工 | Spec／Domain partial | work-order-state domain 已建成待接線 |
+| M5 | 派工、技師任務、照片、檢查表與完工 | Verified | 排程／指派、技師任務、前後照、checklist 與人工完工全鏈路接線：`202607190004_v2_m5_work_order_ops.sql` 的 create/schedule/assign/respond/cancel/transition/photo/checklist/force-complete RPC＋`/api/v2` work-orders／assignments／schedule／photos／checklists routes＋dispatcher 排程與技師任務 UI；377 pgTAP、真實 Supabase integration、dispatcher／technician E2E；本輪 review 10 項修復落實（含 one-active-lead 分區索引負向測試改以全新成員命中正確索引、schedule board keyset 分頁不再靜默截斷）。coverage 於全軌合流後統一重測 |
 | M6 | LINE OA webhook、通知與失敗重試 | Spec／DB partial | 驗章、重送、亂序、斷線 fallback 通過 |
 | M7 | 自由訊息聚合與 AI 整理草稿 | Spec | 顯示來源／信心；AI 故障不影響進件 |
 | M8 | 收款、設備履歷、回訪、KPI 與 Pilot hardening | Spec／DB partial | 真實試點、監控、備份與刪除流程通過 |
@@ -100,15 +102,26 @@
 
 獨立 agent 針對 capability、重試、公開資料與濫用面檢查後提出 1 個 High、5 個 Medium/Low；本輪全數落實到程式與測試：公開 view/respond 改為先提交共享 IP+token budget、token TTL 上限 30 日、相同 mutation key 以 HMAC 重建相同 URL、capability 從 path 移到 fragment+Authorization、production origin 強制 HTTPS、public DTO/request 移除 version UUID，並移除公開頁的 client analytics 與外部字型。平台 Authorization redaction、staging／實機與 cleanup worker 仍列在 production release gate，不冒充已完成部署驗收。
 
-## 下一 Sprint（M5，唯一目標）
+## M5 完成證據
 
 > 讓已接受報價轉出的工單具有可操作工作台：排程／指派、技師手機任務、到場狀態、前後照、checklist 與人工完工。
 
-- Owner／dispatcher 可在案件工作台安排時間與指派技師，不再只有案件編號。
-- Technician 只看到被指派的必要客戶／地點資料，能記錄出發、到場、暫停與完成。
-- Before／after 照片走 private Storage、MIME/size/hash/metadata 驗證與短效 signed URL。
-- 完工前由 server 驗證 checklist 與必要證據；不得靠前端隱藏按鈕取代 DB invariant。
-- M6 前任何 LINE 狀態通知仍需誠實標示未自動發送，不建立假 outbox 成功畫面。
+驗收條件已由 M5 pgTAP、API/component tests、真實 Supabase integration 與 dispatcher／technician Playwright 旅程共同釘住：
+
+- Owner／dispatcher 可在案件工作台安排時間與指派技師（`schedule_work_order` 原子排程＋指派＋draft→scheduled，衝突偵測與 owner override 需理由），不再只有案件編號。
+- Technician 只看到被指派的工單與必要客戶／地點資料（`list_work_orders` 技師只讀自己指派、detail 剝除內部備註），能記錄出發、到場、暫停與完成。
+- Before／after 照片走 private Storage、MIME/size/hash/metadata 驗證與短效 signed URL；未驗證的 pending 照片不算完工證據。
+- 完工前由 server 驗證 checklist 必填項與必要證據、非空完工摘要；owner force-complete 需理由並記 distinct `work_order.force_completed` event，且不偽造客戶簽收。
+- M6 前任何 LINE 狀態通知仍誠實標示未自動發送，不建立假 outbox 成功畫面。
+
+### 2026-07-19 M5 對抗式 code review 結果（本輪 10 項修復）
+
+M5 三軌（domain/RPC、`/api/v2` routes、dispatcher／technician UI）合流後進行對抗式複核，逐項驗證後落實 10 項修復；以下為本輪範圍。其中兩項屬本 review round 的獨立 track（disjoint ownership），已在此輪內修復並回歸：
+
+1. **pgTAP 偽陽性（`09_m5_work_order_ops` 第二個 active lead 負向）**：原測試以已是 helper 的成員重試，實際命中的是 `assignments_work_order_member_uidx`（重複成員），而非它宣稱要證明的 `assignments_one_active_lead_uidx`。改以全新且合格的成員（dispatcher membership，未曾指派於該工單）嘗試 duty `lead`，使 insert 只會違反 one-active-lead 分區索引；斷言 pattern 收斂為 `%assignments_one_active_lead%`，並經 `supabase db reset && npm run test:sql`（377 全綠）驗證。
+2. **Schedule board 靜默截斷（`GET /organizations/{orgId}/schedule`）**：原路由單頁上限 100 且無任何訊號，超過 100 筆的排程對 dispatcher 不可見。改為在有界（≤31 天）視窗內以 keyset cursor 迴圈取滿整個視窗（頁大小 100、最多 50 頁安全上限），回傳 `{ data, meta: { hasMore } }`；正常情況 `hasMore=false` 且無截斷，僅在觸及安全上限時回 `hasMore=true`，dispatcher 永不被靜默蒙蔽。新增路由測試釘住單頁、跨頁迴圈與安全上限三情境。
+
+（其餘 8 項由 M5 各自 track 於本輪同步修復，涵蓋 route/domain/UI 之權限、樂觀鎖、狀態轉移與證據 gate 的邊界；詳見各 track handoff。）
 
 ## Release gates
 

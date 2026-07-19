@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 import {
   createIdempotencyKey,
@@ -187,9 +188,9 @@ export function PilotSettings() {
   return (
     <PilotPage>
       <PilotBrand eyebrow="店家設定" />
-      <a href="/app/inbox" className="mb-4 inline-flex min-h-10 items-center text-sm font-bold text-orange-deep">
+      <Link href="/app/inbox" className="mb-4 inline-flex min-h-10 items-center text-sm font-bold text-orange-deep">
         ← 回接案匣
-      </a>
+      </Link>
       <header className="mb-5">
         <h1 className="text-[28px] font-black tracking-[-0.04em] text-ink">店家與公開表單</h1>
         <p className="mt-2 text-sm leading-6 text-ink-3">

@@ -12,9 +12,14 @@ describe("pilotInboxRpcResultSchema", () => {
     description: "下雨後有水痕",
     status: "new" as const,
     priority: "normal" as const,
+    category: null,
+    lockVersion: 1,
+    customerId: "40000000-0000-4000-8000-000000000001",
+    assignedMemberId: null,
+    triagedAt: null,
     serviceCatalogItemId: "71100000-0000-4000-8000-000000000001",
     serviceName: "現場估價",
-    category: "防水工程",
+    serviceCategory: "防水工程",
     address: "台北市松山區民生東路四段 88 號",
     photoCount: 2,
     preferredWindows: [
@@ -35,6 +40,23 @@ describe("pilotInboxRpcResultSchema", () => {
 
   it("accepts the allowlisted staff inbox projection", () => {
     expect(pilotInboxRpcResultSchema.parse(result)).toEqual(result);
+  });
+
+  it("accepts the triage provenance fields on a triaged row", () => {
+    const triaged = {
+      ...row,
+      status: "triaged" as const,
+      category: "waterproofing",
+      lockVersion: 2,
+      assignedMemberId: "30000000-0000-4000-8000-000000000002",
+      triagedAt: "2026-07-17T02:00:00.000Z",
+    };
+    expect(
+      pilotInboxRpcResultSchema.parse({
+        organizationId: result.organizationId,
+        items: [triaged],
+      }).items[0],
+    ).toEqual(triaged);
   });
 
   it("rejects internal tenant and storage fields on rows", () => {
@@ -58,13 +80,17 @@ describe("pilotInboxRpcResultSchema", () => {
       contactName: "王先生",
       contactPhone: "+886912345678",
       serviceName: "現場估價",
-      category: "防水工程",
+      category: null,
       title: "浴室牆面滲水",
       description: "下雨後有水痕",
       address: "台北市松山區民生東路四段 88 號",
       photoCount: 2,
       status: "new",
       priority: "normal",
+      lockVersion: 1,
+      customerId: "40000000-0000-4000-8000-000000000001",
+      assignedMemberId: null,
+      triagedAt: null,
       createdAt: "2026-07-16T10:00:00.000Z",
     });
   });
@@ -74,6 +100,7 @@ describe("pilotInboxRpcResultSchema", () => {
       ...row,
       serviceCatalogItemId: null,
       serviceName: null,
+      serviceCategory: null,
       category: null,
       address: null,
     });

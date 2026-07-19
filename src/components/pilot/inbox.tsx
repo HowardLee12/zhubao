@@ -2,17 +2,75 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { fetchPilotInbox, fetchPilotSession, type PilotInboxItem } from "./api";
+import { fetchPilotInbox, fetchPilotSession, PilotApiError, type PilotInboxItem } from "./api";
 import { PilotBrand, PilotButton, PilotCard, PilotError, PilotLoading, PilotPage } from "./ui";
 
-interface InboxState {
-  status: "loading" | "ready" | "error";
-  items: PilotInboxItem[];
+type InboxTab = "pending" | "triaged" | "all";
+
+const DISPATCH_ROLES = new Set(["owner", "admin", "dispatcher"]);
+
+interface TabDefinition {
+  id: InboxTab;
+  label: string;
+  status?: string;
+  emptyHeading: string;
+  emptyBody: string;
 }
+
+const TABS: readonly TabDefinition[] = [
+  {
+    id: "pending",
+    label: "待處理",
+    status: "new",
+    emptyHeading: "目前沒有待處理的進件",
+    emptyBody: "把公開報修連結放進 LINE 圖文選單或直接傳給客戶即可開始收件。",
+  },
+  {
+    id: "triaged",
+    label: "已分流",
+    status: "triaged",
+    emptyHeading: "目前沒有已分流的案件",
+    emptyBody: "分流後的案件會顯示在這裡，方便追蹤負責人與後續處理。",
+  },
+  {
+    id: "all",
+    label: "全部",
+    emptyHeading: "目前沒有任何進件",
+    emptyBody: "所有進件（含已處理、已轉換）都會出現在這個清單。",
+  },
+];
+
+const statusLabels: Record<PilotInboxItem["status"], string> = {
+  new: "待處理",
+  triaged: "已分流",
+  quoting: "報價中",
+  quoted: "已報價",
+  converted: "已轉換",
+  declined: "不適用",
+  cancelled: "已取消",
+};
 
 const sourceLabels: Record<PilotInboxItem["source"], string> = {
   web: "公開表單",
 };
+
+interface LoadedPage {
+  items: PilotInboxItem[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+type LoadStatus = "loading" | "ready" | "error" | "restricted";
+
+interface InboxState {
+  status: LoadStatus;
+  tab: InboxTab;
+  organizationId: string | null;
+  page: LoadedPage;
+  loadingMore: boolean;
+}
+
+const emptyPage: LoadedPage = { items: [], nextCursor: null, hasMore: false };
 
 const defaultNow = () => new Date();
 
@@ -25,29 +83,95 @@ export function formatWaitingTime(createdAt: string, now: Date): string {
   return `已等 ${Math.floor(hours / 24)} 天`;
 }
 
-export function PilotInbox({ now = defaultNow }: { now?: () => Date }) {
-  const [state, setState] = useState<InboxState>({ status: "loading", items: [] });
+function tabDefinition(tab: InboxTab): TabDefinition {
+  return TABS.find((candidate) => candidate.id === tab) ?? TABS[0];
+}
 
-  const loadInbox = useCallback(async () => {
-    setState((current) => ({ ...current, status: "loading" }));
+export function PilotInbox({ now = defaultNow }: Readonly<{ now?: () => Date }>) {
+  const [state, setState] = useState<InboxState>({
+    status: "loading",
+    tab: "pending",
+    organizationId: null,
+    page: emptyPage,
+    loadingMore: false,
+  });
+
+  // Loads a tab's first page. Session resolution (which member/org is active) is
+  // done once here when no organization is bound yet; subsequent tab switches
+  // reuse the already-resolved organization so we never re-hit the session RPC.
+  const loadTab = useCallback(async (tab: InboxTab, knownOrganizationId: string | null) => {
+    setState((current) => ({ ...current, status: "loading", tab, page: emptyPage }));
     try {
-      const session = await fetchPilotSession();
-      const activeMembership = session.memberships.find(
-        (membership) => membership.status === "active",
-      );
-      if (!activeMembership) {
-        throw new Error("尚未建立工作空間");
+      let organizationId = knownOrganizationId;
+      if (!organizationId) {
+        const session = await fetchPilotSession();
+        const activeMembership = session.memberships.find(
+          (membership) => membership.status === "active",
+        );
+        if (!activeMembership) {
+          throw new Error("尚未建立工作空間");
+        }
+        if (!DISPATCH_ROLES.has(activeMembership.role)) {
+          setState((current) => ({
+            ...current,
+            status: "restricted",
+            tab,
+            organizationId: activeMembership.organizationId,
+            page: emptyPage,
+          }));
+          return;
+        }
+        organizationId = activeMembership.organizationId;
       }
-      const page = await fetchPilotInbox(activeMembership.organizationId);
-      setState({ status: "ready", items: page.data });
-    } catch {
-      setState({ status: "error", items: [] });
+
+      const page = await fetchPilotInbox(organizationId, {
+        status: tabDefinition(tab).status,
+      });
+      setState((current) => ({
+        ...current,
+        status: "ready",
+        tab,
+        organizationId,
+        page: { items: page.data, nextCursor: page.meta.nextCursor, hasMore: page.meta.hasMore },
+      }));
+    } catch (error) {
+      if (error instanceof PilotApiError && error.status === 403) {
+        setState((current) => ({ ...current, status: "restricted", tab, page: emptyPage }));
+        return;
+      }
+      setState((current) => ({ ...current, status: "error", tab, page: emptyPage }));
     }
   }, []);
 
+  const loadMore = useCallback(
+    async (organizationId: string, tab: InboxTab, cursor: string) => {
+      setState((current) => ({ ...current, loadingMore: true }));
+      try {
+        const page = await fetchPilotInbox(organizationId, {
+          status: tabDefinition(tab).status,
+          cursor,
+        });
+        setState((current) => ({
+          ...current,
+          loadingMore: false,
+          page: {
+            items: [...current.page.items, ...page.data],
+            nextCursor: page.meta.nextCursor,
+            hasMore: page.meta.hasMore,
+          },
+        }));
+      } catch {
+        setState((current) => ({ ...current, loadingMore: false }));
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
-    void loadInbox();
-  }, [loadInbox]);
+    void loadTab("pending", null);
+  }, [loadTab]);
+
+  const activeTab = tabDefinition(state.tab);
 
   return (
     <PilotPage>
@@ -58,8 +182,19 @@ export function PilotInbox({ now = defaultNow }: { now?: () => Date }) {
           title="接案匣暫時讀不到"
           description="需求仍保存在系統中。請確認網路後重新載入，不需要請客戶重送。"
           actionLabel="重新載入"
-          onRetry={() => void loadInbox()}
+          onRetry={() => void loadTab(state.tab, state.organizationId)}
         />
+      ) : null}
+      {state.status === "restricted" ? (
+        <PilotCard className="py-10 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-soft text-2xl font-black text-orange-deep">
+            ！
+          </div>
+          <h1 className="mt-4 text-xl font-black tracking-tight text-ink">沒有接案匣權限</h1>
+          <p className="mt-2 text-sm leading-6 text-ink-3">
+            接案匣只開放給有派工權限的成員（負責人、管理員或派工員）。若你需要處理進件，請聯絡店家管理員調整你的角色。
+          </p>
+        </PilotCard>
       ) : null}
       {state.status === "ready" ? (
         <>
@@ -71,34 +206,58 @@ export function PilotInbox({ now = defaultNow }: { now?: () => Date }) {
               店家設定
             </a>
           </nav>
-          <header className="mb-5 flex items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold text-orange-deep">待你確認</p>
-              <h1 className="mt-1 text-[28px] font-black tracking-[-0.04em] text-ink">接案匣</h1>
-              <p className="mt-1 text-sm text-ink-3">公開表單送出後會保存在這裡。</p>
-            </div>
-            <span className="inline-flex h-11 min-w-11 items-center justify-center rounded-2xl bg-ink px-3 font-mono text-sm font-black text-white">
-              {String(state.items.length).padStart(2, "0")}
-              <span className="sr-only">筆新進件</span>
-            </span>
+          <header className="mb-5">
+            <p className="text-xs font-bold text-orange-deep">待你確認</p>
+            <h1 className="mt-1 text-[28px] font-black tracking-[-0.04em] text-ink">接案匣</h1>
+            <p className="mt-1 text-sm text-ink-3">公開表單送出後會保存在這裡。</p>
           </header>
 
-          {state.items.length === 0 ? (
+          <div
+            role="tablist"
+            aria-label="接案匣分類"
+            className="mb-5 flex gap-1 rounded-2xl border border-warm-border bg-white p-1"
+          >
+            {TABS.map((tab) => {
+              const selected = tab.id === state.tab;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  className={`min-h-10 flex-1 rounded-xl px-3 text-sm font-bold transition ${
+                    selected
+                      ? "bg-orange text-white shadow-[0_8px_20px_rgba(226,105,31,0.2)]"
+                      : "text-ink-3 hover:bg-orange-soft/50"
+                  }`}
+                  onClick={() => {
+                    if (!selected) void loadTab(tab.id, state.organizationId);
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {state.page.items.length === 0 ? (
             <PilotCard className="py-12 text-center">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-orange-soft text-2xl font-black text-orange-deep">
                 0
               </div>
-              <h2 className="mt-5 text-xl font-black text-ink">目前沒有新進件</h2>
-              <p className="mt-2 text-sm leading-6 text-ink-3">
-                把公開報修連結放進 LINE 圖文選單或直接傳給客戶即可開始收件。
-              </p>
-              <PilotButton variant="secondary" className="mt-5" onClick={() => void loadInbox()}>
+              <h2 className="mt-5 text-xl font-black text-ink">{activeTab.emptyHeading}</h2>
+              <p className="mt-2 text-sm leading-6 text-ink-3">{activeTab.emptyBody}</p>
+              <PilotButton
+                variant="secondary"
+                className="mt-5"
+                onClick={() => void loadTab(state.tab, state.organizationId)}
+              >
                 重新整理
               </PilotButton>
             </PilotCard>
           ) : (
             <div className="space-y-4">
-              {state.items.map((item) => (
+              {state.page.items.map((item) => (
                 <article
                   key={item.id}
                   className="overflow-hidden rounded-[24px] border border-warm-border bg-white shadow-[0_14px_36px_rgba(74,45,20,0.07)]"
@@ -107,9 +266,14 @@ export function PilotInbox({ now = defaultNow }: { now?: () => Date }) {
                     <span className="text-xs font-bold text-orange-deep">
                       {sourceLabels[item.source]} · {item.referenceNo}
                     </span>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--warm-red)]">
-                      {formatWaitingTime(item.createdAt, now())}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-ink-2">
+                        {statusLabels[item.status]}
+                      </span>
+                      <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--warm-red)]">
+                        {formatWaitingTime(item.createdAt, now())}
+                      </span>
+                    </div>
                   </div>
                   <div className="p-5">
                     <div className="flex flex-wrap items-center gap-2">
@@ -150,16 +314,30 @@ export function PilotInbox({ now = defaultNow }: { now?: () => Date }) {
                       </div>
                     </dl>
 
-                    <div
-                      role="status"
-                      aria-label="案件處理狀態"
-                      className="mt-4 rounded-xl border border-orange/20 bg-orange-soft/50 px-4 py-3 text-center text-xs font-bold leading-5 text-orange-deep"
+                    <a
+                      href={`/app/inbox/${item.id}`}
+                      className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-orange px-4 text-sm font-bold text-white shadow-[0_10px_25px_rgba(226,105,31,0.22)] transition hover:bg-orange-deep"
                     >
-                      已保存；案件整理與轉報價會在下一階段開放
-                    </div>
+                      查看並整理進件
+                    </a>
                   </div>
                 </article>
               ))}
+
+              {state.page.hasMore && state.organizationId && state.page.nextCursor ? (
+                <PilotButton
+                  variant="secondary"
+                  className="w-full"
+                  disabled={state.loadingMore}
+                  onClick={() => {
+                    if (state.organizationId && state.page.nextCursor) {
+                      void loadMore(state.organizationId, state.tab, state.page.nextCursor);
+                    }
+                  }}
+                >
+                  {state.loadingMore ? "載入中…" : "載入更多"}
+                </PilotButton>
+              ) : null}
             </div>
           )}
         </>

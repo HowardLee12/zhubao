@@ -224,9 +224,23 @@ export async function createPilotOrganization(
   return envelope.data;
 }
 
-export async function fetchPilotInbox(organizationId: string): Promise<PilotInboxPage> {
+export interface FetchPilotInboxOptions {
+  status?: string;
+  cursor?: string | null;
+  limit?: number;
+}
+
+export async function fetchPilotInbox(
+  organizationId: string,
+  options: FetchPilotInboxOptions = {},
+): Promise<PilotInboxPage> {
+  const params = new URLSearchParams();
+  if (options.status) params.set("status", options.status);
+  if (options.cursor) params.set("cursor", options.cursor);
+  params.set("limit", String(options.limit ?? 20));
+
   const response = await fetch(
-    `/api/v2/organizations/${encodeURIComponent(organizationId)}/service-requests?status=new&limit=50`,
+    `/api/v2/organizations/${encodeURIComponent(organizationId)}/service-requests?${params.toString()}`,
     {
       method: "GET",
       headers: { Accept: "application/json" },

@@ -20,9 +20,11 @@ const preferredWindowSchema = z
   })
   .strict();
 
-// Mirrors the list_pilot_service_requests RPC row shape exactly (SQL is the
-// pgTAP-pinned source of truth). It is intentionally strict so any drift or an
-// internal column leaking into the projection fails loudly.
+// Mirrors the list_pilot_service_requests keyset RPC row shape exactly (SQL is
+// the pgTAP-pinned source of truth). It is intentionally strict so any drift or
+// an internal column leaking into the projection fails loudly. The keyset
+// overload adds triage provenance (lockVersion/customerId/assignedMemberId/
+// triagedAt/serviceCategory) on top of the legacy inbox row.
 const pilotInboxRpcItemSchema = z
   .object({
     id: z.uuid(),
@@ -33,9 +35,14 @@ const pilotInboxRpcItemSchema = z
     description: z.string().max(10_000),
     status: serviceRequestStatusSchema,
     priority: serviceRequestPrioritySchema,
+    category: z.string().min(1).max(120).nullable(),
+    lockVersion: z.number().int().min(1),
+    customerId: z.uuid().nullable(),
+    assignedMemberId: z.uuid().nullable(),
+    triagedAt: z.iso.datetime({ offset: true }).nullable(),
     serviceCatalogItemId: z.uuid().nullable(),
     serviceName: z.string().min(1).max(120).nullable(),
-    category: z.string().min(1).max(120).nullable(),
+    serviceCategory: z.string().min(1).max(120).nullable(),
     address: z.string().max(1_000).nullable(),
     photoCount: z.number().int().min(0),
     preferredWindows: z.array(preferredWindowSchema).max(20),
@@ -70,6 +77,10 @@ export interface PilotInboxItem {
   photoCount: number;
   status: z.infer<typeof serviceRequestStatusSchema>;
   priority: z.infer<typeof serviceRequestPrioritySchema>;
+  lockVersion: number;
+  customerId: string | null;
+  assignedMemberId: string | null;
+  triagedAt: string | null;
   createdAt: string;
 }
 
@@ -88,6 +99,10 @@ export function toPilotInboxItem(row: PilotInboxRpcItem): PilotInboxItem {
     photoCount: row.photoCount,
     status: row.status,
     priority: row.priority,
+    lockVersion: row.lockVersion,
+    customerId: row.customerId,
+    assignedMemberId: row.assignedMemberId,
+    triagedAt: row.triagedAt,
     createdAt: row.createdAt,
   };
 }

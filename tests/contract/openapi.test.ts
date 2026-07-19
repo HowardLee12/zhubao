@@ -68,9 +68,9 @@ describe("OpenAPI contract", () => {
       });
     });
 
-    expect(Object.keys(paths)).toHaveLength(117);
-    expect(operations).toHaveLength(158);
-    expect(Object.keys(schemas)).toHaveLength(256);
+    expect(Object.keys(paths)).toHaveLength(121);
+    expect(operations).toHaveLength(162);
+    expect(Object.keys(schemas)).toHaveLength(287);
   });
 
   it("keeps every internal reference resolvable", () => {
@@ -99,7 +99,109 @@ describe("OpenAPI contract", () => {
       });
     });
 
-    expect(operationIds).toHaveLength(158);
+    expect(operationIds).toHaveLength(162);
     expect(new Set(operationIds).size).toBe(operationIds.length);
+  });
+
+  it("pins the implemented M3 pilot envelopes instead of aspirational full-resource DTOs", () => {
+    expect(isRecord(parsedDocument)).toBe(true);
+    if (!isRecord(parsedDocument)) return;
+    const paths = parsedDocument.paths as JsonRecord;
+
+    function responseRef(path: string, method: string, status: string): unknown {
+      const pathItem = paths[path] as JsonRecord;
+      const operation = pathItem[method] as JsonRecord;
+      const responses = operation.responses as JsonRecord;
+      const response = responses[status] as JsonRecord;
+      const content = response.content as JsonRecord;
+      const media = content["application/json"] as JsonRecord;
+      return (media.schema as JsonRecord).$ref;
+    }
+
+    function requestRef(path: string, method: string): unknown {
+      const pathItem = paths[path] as JsonRecord;
+      const operation = pathItem[method] as JsonRecord;
+      const requestBody = operation.requestBody as JsonRecord;
+      const content = requestBody.content as JsonRecord;
+      const media = content["application/json"] as JsonRecord;
+      return (media.schema as JsonRecord).$ref;
+    }
+
+    expect(responseRef("/organizations/{orgId}/service-requests", "get", "200")).toBe(
+      "#/components/schemas/PilotInboxListEnvelope",
+    );
+    expect(responseRef("/organizations/{orgId}/service-requests/{id}", "get", "200")).toBe(
+      "#/components/schemas/PilotServiceRequestDetailEnvelope",
+    );
+    expect(responseRef("/organizations/{orgId}/service-requests/{id}", "patch", "200")).toBe(
+      "#/components/schemas/PilotServiceRequestDetailEnvelope",
+    );
+    expect(requestRef("/organizations/{orgId}/service-requests/{id}", "patch")).toBe(
+      "#/components/schemas/PilotUpdateServiceRequestSummaryRequest",
+    );
+    for (const action of ["triage", "start-quoting", "mark-quoted", "decline", "cancel"]) {
+      expect(
+        responseRef(
+          `/organizations/{orgId}/service-requests/{id}/actions/${action}`,
+          "post",
+          "200",
+        ),
+      ).toBe("#/components/schemas/PilotServiceRequestActionEnvelope");
+    }
+    expect(
+      responseRef(
+        "/organizations/{orgId}/service-requests/{id}/actions/convert",
+        "post",
+        "201",
+      ),
+    ).toBe("#/components/schemas/PilotConversionEnvelope");
+    expect(responseRef("/organizations/{orgId}/customers", "post", "201")).toBe(
+      "#/components/schemas/PilotCustomerEnvelope",
+    );
+    expect(requestRef("/organizations/{orgId}/customers", "post")).toBe(
+      "#/components/schemas/PilotCreateCustomerRequest",
+    );
+    expect(
+      responseRef(
+        "/organizations/{orgId}/customers/{customerId}/locations",
+        "get",
+        "200",
+      ),
+    ).toBe("#/components/schemas/PilotCustomerLocationListEnvelope");
+    expect(
+      responseRef(
+        "/organizations/{orgId}/customers/{customerId}/assets",
+        "get",
+        "200",
+      ),
+    ).toBe("#/components/schemas/PilotCustomerAssetListEnvelope");
+    expect(
+      responseRef(
+        "/organizations/{orgId}/service-requests/{id}/events",
+        "get",
+        "200",
+      ),
+    ).toBe("#/components/schemas/PilotServiceRequestEventListEnvelope");
+    expect(
+      responseRef(
+        "/organizations/{orgId}/service-requests/{id}/photos",
+        "get",
+        "200",
+      ),
+    ).toBe("#/components/schemas/PilotServiceRequestPhotoListEnvelope");
+
+    const markQuotedPath = paths[
+      "/organizations/{orgId}/service-requests/{id}/actions/mark-quoted"
+    ] as JsonRecord;
+    const markQuotedPost = markQuotedPath.post as JsonRecord;
+    expect(markQuotedPost).not.toHaveProperty("requestBody");
+
+    const components = parsedDocument.components as JsonRecord;
+    const schemas = components.schemas as JsonRecord;
+    const convertWorkOrder = schemas.ConvertWorkOrderInput as JsonRecord;
+    const convertProperties = convertWorkOrder.properties as JsonRecord;
+    expect(convertProperties).not.toHaveProperty("assigneeMembershipIds");
+    const preferredWindow = schemas.PreferredTimeWindow as JsonRecord;
+    expect(preferredWindow.required).toEqual(["startsAt", "endsAt", "preferenceRank"]);
   });
 });

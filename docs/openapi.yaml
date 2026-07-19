@@ -232,6 +232,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/PilotPublicIntakeLinkEnvelope"
 
+  /organizations/{orgId}/members:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    get:
+      tags: [Organizations]
+      operationId: listPilotAssignableMembers
+      summary: List active operational members for the pilot assignment picker
+      description: |
+        Manager-only pilot projection. Returns no email, phone, user id or
+        organization id; accountant/viewer and inactive memberships are omitted.
+      responses:
+        <<: *standardErrors
+        "200":
+          description: Active owner/admin/dispatcher/technician memberships.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PilotAssignableMemberListEnvelope"
+
   /organizations/{orgId}/memberships:
     parameters:
       - $ref: "#/components/parameters/OrgId"
@@ -370,63 +389,86 @@ paths:
     get:
       tags: [Customers]
       operationId: listCustomers
-      summary: List customers
+      summary: List customers for the pilot triage workspace
       parameters:
-        - $ref: "#/components/parameters/Cursor"
-        - $ref: "#/components/parameters/Limit"
-        - $ref: "#/components/parameters/SearchQuery"
-        - name: kind
-          in: query
-          schema:
-            $ref: "#/components/schemas/CustomerKind"
-        - name: source
-          in: query
-          schema:
-            $ref: "#/components/schemas/CustomerSource"
-        - name: tag
+        - name: q
           in: query
           schema:
             type: string
             minLength: 1
-            maxLength: 30
-        - name: updatedAfter
+            maxLength: 120
+        - name: limit
           in: query
           schema:
-            $ref: "#/components/schemas/Timestamp"
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
       responses:
         <<: *standardErrors
         "200":
-          description: Customer page.
+          description: Customer confirmation rows; no internal columns or cursor metadata.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CustomerListEnvelope"
+                $ref: "#/components/schemas/PilotCustomerListEnvelope"
     post:
       tags: [Customers]
       operationId: createCustomer
       summary: Create a customer
       security: *employeeWriteSecurity
-      parameters:
-        - $ref: "#/components/parameters/IdempotencyKeyOptional"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateCustomerRequest"
+              $ref: "#/components/schemas/PilotCreateCustomerRequest"
       responses:
         <<: *standardErrors
         "201":
           description: Customer created.
-          headers:
-            Location:
-              $ref: "#/components/headers/Location"
-            ETag:
-              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CustomerEnvelope"
+                $ref: "#/components/schemas/PilotCustomerEnvelope"
+
+  /organizations/{orgId}/customers/similar:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    get:
+      tags: [Customers]
+      operationId: findSimilarCustomers
+      summary: Find similar customers for triage duplicate hints
+      description: >-
+        Tenant-scoped hint search over phone and name used while triaging a
+        request. At least one of phone or name must be provided. Returns
+        hint-only rows; it never merges customers.
+      parameters:
+        - name: phone
+          in: query
+          schema:
+            $ref: "#/components/schemas/E164Phone"
+        - name: name
+          in: query
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 25
+            default: 5
+      responses:
+        <<: *standardErrors
+        "200":
+          description: Similar customer hints.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimilarCustomerListEnvelope"
 
   /organizations/{orgId}/customers/{customerId}:
     parameters:
@@ -504,7 +546,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LocationListEnvelope"
+                $ref: "#/components/schemas/PilotCustomerLocationListEnvelope"
     post:
       tags: [Customers]
       operationId: createCustomerLocation
@@ -524,6 +566,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LocationEnvelope"
+
+  /organizations/{orgId}/customers/{customerId}/assets:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+      - $ref: "#/components/parameters/CustomerId"
+    get:
+      tags: [Customers]
+      operationId: listPilotCustomerAssets
+      summary: List a customer's assets for the pilot triage workspace
+      responses:
+        <<: *standardErrors
+        "200":
+          description: Customer assets projected by the authenticated pilot RPC.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PilotCustomerAssetListEnvelope"
 
   /organizations/{orgId}/locations/{locationId}:
     parameters:
@@ -704,35 +763,14 @@ paths:
     get:
       tags: [Service requests]
       operationId: listServiceRequests
-      summary: List service requests
+      summary: List pilot inbox service requests
       parameters:
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
-        - $ref: "#/components/parameters/SearchQuery"
         - name: status
           in: query
           schema:
             $ref: "#/components/schemas/ServiceRequestStatus"
-        - name: priority
-          in: query
-          schema:
-            $ref: "#/components/schemas/Priority"
-        - name: source
-          in: query
-          schema:
-            $ref: "#/components/schemas/ServiceRequestSource"
-        - name: assignedMemberId
-          in: query
-          schema:
-            $ref: "#/components/schemas/Uuid"
-        - name: createdFrom
-          in: query
-          schema:
-            $ref: "#/components/schemas/Timestamp"
-        - name: createdTo
-          in: query
-          schema:
-            $ref: "#/components/schemas/Timestamp"
       responses:
         <<: *standardErrors
         "200":
@@ -740,7 +778,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ServiceRequestListEnvelope"
+                $ref: "#/components/schemas/PilotInboxListEnvelope"
     post:
       tags: [Service requests]
       operationId: createServiceRequest
@@ -786,7 +824,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ServiceRequestEnvelope"
+                $ref: "#/components/schemas/PilotServiceRequestDetailEnvelope"
     patch:
       tags: [Service requests]
       operationId: updateServiceRequest
@@ -799,7 +837,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateServiceRequestRequest"
+              $ref: "#/components/schemas/PilotUpdateServiceRequestSummaryRequest"
       responses:
         <<: *standardErrors
         "200":
@@ -810,7 +848,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ServiceRequestEnvelope"
+                $ref: "#/components/schemas/PilotServiceRequestDetailEnvelope"
 
   /organizations/{orgId}/service-requests/{id}/actions/triage:
     parameters:
@@ -835,7 +873,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ServiceRequestEnvelope"
+                $ref: "#/components/schemas/PilotServiceRequestActionEnvelope"
 
   /organizations/{orgId}/service-requests/{id}/actions/start-quoting:
     parameters:
@@ -854,7 +892,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ServiceRequestEnvelope"
+                $ref: "#/components/schemas/PilotServiceRequestActionEnvelope"
 
   /organizations/{orgId}/service-requests/{id}/actions/mark-quoted:
     parameters:
@@ -866,12 +904,6 @@ paths:
       operationId: markServiceRequestQuoted
       summary: Mark request quoted after a quote version was sent
       security: *employeeWriteSecurity
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/MarkQuotedRequest"
       responses:
         <<: *standardErrors
         "200":
@@ -879,7 +911,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ServiceRequestEnvelope"
+                $ref: "#/components/schemas/PilotServiceRequestActionEnvelope"
 
   /organizations/{orgId}/service-requests/{id}/actions/convert:
     parameters:
@@ -905,7 +937,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ConversionEnvelope"
+                $ref: "#/components/schemas/PilotConversionEnvelope"
 
   /organizations/{orgId}/service-requests/{id}/actions/decline:
     parameters:
@@ -926,7 +958,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ServiceRequestEnvelope"
+                $ref: "#/components/schemas/PilotServiceRequestActionEnvelope"
 
   /organizations/{orgId}/service-requests/{id}/actions/cancel:
     parameters:
@@ -947,7 +979,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ServiceRequestEnvelope"
+                $ref: "#/components/schemas/PilotServiceRequestActionEnvelope"
 
   /organizations/{orgId}/service-requests/{id}/events:
     parameters:
@@ -958,8 +990,18 @@ paths:
       operationId: listServiceRequestEvents
       summary: List append-only service request events
       parameters:
-        - $ref: "#/components/parameters/Cursor"
-        - $ref: "#/components/parameters/Limit"
+        - name: afterSequence
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
       responses:
         <<: *standardErrors
         "200":
@@ -967,7 +1009,24 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/EventListEnvelope"
+                $ref: "#/components/schemas/PilotServiceRequestEventListEnvelope"
+
+  /organizations/{orgId}/service-requests/{id}/photos:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+      - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [Service requests]
+      operationId: listPilotServiceRequestPhotos
+      summary: List private intake photos with short-lived signed URLs
+      responses:
+        <<: *standardErrors
+        "200":
+          description: Signed photo projections; storage paths are never returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PilotServiceRequestPhotoListEnvelope"
 
   /public/intake/{token}:
     parameters:
@@ -4231,6 +4290,55 @@ components:
         meta:
           $ref: "#/components/schemas/ListMeta"
       required: [data, meta]
+    PilotServiceRequestEvent:
+      type: object
+      additionalProperties: false
+      description: Redacted append-only M3 request timeline row.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        eventType:
+          type: string
+          minLength: 1
+          maxLength: 160
+        actorType:
+          type: string
+          enum: [user, customer, system, line]
+        actorUserId:
+          type: [string, "null"]
+          format: uuid
+        occurredAt:
+          $ref: "#/components/schemas/Timestamp"
+        chainSequence:
+          type: integer
+          minimum: 1
+        payload:
+          type: object
+          description: Allowlisted event payload with the raw submission copy removed.
+          additionalProperties: true
+      required: [id, eventType, actorType, actorUserId, occurredAt, chainSequence, payload]
+    PilotServiceRequestEventListMeta:
+      type: object
+      additionalProperties: false
+      properties:
+        hasMore:
+          type: boolean
+        nextCursor:
+          type: [integer, "null"]
+          minimum: 1
+      required: [hasMore, nextCursor]
+    PilotServiceRequestEventListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/PilotServiceRequestEvent"
+        meta:
+          $ref: "#/components/schemas/PilotServiceRequestEventListMeta"
+      required: [data, meta]
 
     Health:
       type: object
@@ -4301,6 +4409,33 @@ components:
         updatedAt:
           $ref: "#/components/schemas/Timestamp"
       required: [id, organizationId, userId, email, displayName, role, status, phone, lockVersion, createdAt, updatedAt]
+    PilotAssignableMember:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 80
+        role:
+          type: string
+          enum: [owner, admin, dispatcher, technician]
+        status:
+          type: string
+          const: active
+      required: [id, displayName, role, status]
+    PilotAssignableMemberListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/PilotAssignableMember"
+      required: [data]
     Organization:
       type: object
       additionalProperties: false
@@ -4681,6 +4816,223 @@ components:
         meta:
           $ref: "#/components/schemas/ListMeta"
       required: [data, meta]
+    PilotCustomer:
+      type: object
+      additionalProperties: false
+      description: Exact customer projection implemented by the M3 triage workspace.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        customerNo:
+          type: string
+          minLength: 1
+          maxLength: 40
+        kind:
+          $ref: "#/components/schemas/CustomerKind"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        phone:
+          anyOf:
+            - $ref: "#/components/schemas/E164Phone"
+            - type: "null"
+        email:
+          type: [string, "null"]
+          format: email
+          maxLength: 254
+        companyName:
+          type: [string, "null"]
+          maxLength: 200
+        source:
+          $ref: "#/components/schemas/CustomerSource"
+        notes:
+          type: string
+          maxLength: 5000
+        lastContactAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        lockVersion:
+          $ref: "#/components/schemas/LockVersion"
+        createdAt:
+          $ref: "#/components/schemas/Timestamp"
+        updatedAt:
+          $ref: "#/components/schemas/Timestamp"
+      required: [id, customerNo, kind, name, phone, email, companyName, source, notes, lastContactAt, lockVersion, createdAt, updatedAt]
+    PilotCreateCustomerRequest:
+      type: object
+      additionalProperties: false
+      description: Minimal real customer creation input used while triaging an unbound request.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        phone:
+          anyOf:
+            - $ref: "#/components/schemas/E164Phone"
+            - type: "null"
+      required: [name]
+    PilotCustomerEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/PilotCustomer"
+      required: [data]
+    PilotCustomerListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/PilotCustomer"
+      required: [data]
+    PilotCustomerLocation:
+      type: object
+      additionalProperties: false
+      description: Exact location projection used by the M3 customer confirmation step.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        customerId:
+          $ref: "#/components/schemas/Uuid"
+        label:
+          type: string
+          minLength: 1
+          maxLength: 80
+        contactName:
+          type: [string, "null"]
+          maxLength: 120
+        contactPhone:
+          anyOf:
+            - $ref: "#/components/schemas/E164Phone"
+            - type: "null"
+        postalCode:
+          type: [string, "null"]
+          maxLength: 12
+        county:
+          type: [string, "null"]
+          maxLength: 80
+        district:
+          type: [string, "null"]
+          maxLength: 80
+        addressLine:
+          type: string
+          minLength: 1
+          maxLength: 300
+        accessNotes:
+          type: string
+          maxLength: 2000
+        isDefault:
+          type: boolean
+        lockVersion:
+          $ref: "#/components/schemas/LockVersion"
+        createdAt:
+          $ref: "#/components/schemas/Timestamp"
+        updatedAt:
+          $ref: "#/components/schemas/Timestamp"
+      required: [id, customerId, label, contactName, contactPhone, postalCode, county, district, addressLine, accessNotes, isDefault, lockVersion, createdAt, updatedAt]
+    PilotCustomerLocationListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotCustomerLocation"
+      required: [data]
+    PilotCustomerAsset:
+      type: object
+      additionalProperties: false
+      description: Exact asset projection used by the M3 customer confirmation step.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        customerId:
+          $ref: "#/components/schemas/Uuid"
+        locationId:
+          $ref: "#/components/schemas/Uuid"
+        assetNo:
+          type: string
+          minLength: 1
+          maxLength: 40
+        assetType:
+          type: string
+          enum: [air_conditioner, water_heater, pump, appliance, other]
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        brand:
+          type: [string, "null"]
+          maxLength: 120
+        model:
+          type: [string, "null"]
+          maxLength: 120
+        serialNumber:
+          type: [string, "null"]
+          maxLength: 120
+        installedOn:
+          anyOf:
+            - $ref: "#/components/schemas/BusinessDate"
+            - type: "null"
+        status:
+          $ref: "#/components/schemas/AssetStatus"
+        lockVersion:
+          $ref: "#/components/schemas/LockVersion"
+        createdAt:
+          $ref: "#/components/schemas/Timestamp"
+        updatedAt:
+          $ref: "#/components/schemas/Timestamp"
+      required: [id, customerId, locationId, assetNo, assetType, name, brand, model, serialNumber, installedOn, status, lockVersion, createdAt, updatedAt]
+    PilotCustomerAssetListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotCustomerAsset"
+      required: [data]
+    SimilarCustomer:
+      type: object
+      additionalProperties: false
+      description: >-
+        Tenant-scoped hint used during triage to surface possible duplicate
+        customers. Hint-only: never auto-merges. matchReason explains why the
+        row matched (phone or name).
+      properties:
+        customerId:
+          $ref: "#/components/schemas/Uuid"
+        customerNo:
+          type: string
+          maxLength: 40
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        phone:
+          anyOf:
+            - $ref: "#/components/schemas/E164Phone"
+            - type: "null"
+        matchReason:
+          type: string
+          enum: [phone, name]
+      required: [customerId, customerNo, name, phone, matchReason]
+    SimilarCustomerListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/SimilarCustomer"
+      required: [data]
 
     Location:
       type: object
@@ -4944,7 +5296,11 @@ components:
           $ref: "#/components/schemas/Timestamp"
         endsAt:
           $ref: "#/components/schemas/Timestamp"
-      required: [startsAt, endsAt]
+        preferenceRank:
+          type: integer
+          minimum: 1
+          maximum: 5
+      required: [startsAt, endsAt, preferenceRank]
     ServiceRequest:
       type: object
       additionalProperties: false
@@ -4973,7 +5329,14 @@ components:
           type: string
           minLength: 1
           maxLength: 100
+        subject:
+          description: Canonical short summary of the request. Maps to the service_requests.subject column.
+          type: string
+          minLength: 1
+          maxLength: 160
         title:
+          description: Deprecated alias of subject, retained for backwards compatibility. Always mirrors subject.
+          deprecated: true
           type: string
           minLength: 1
           maxLength: 160
@@ -4989,6 +5352,9 @@ components:
           anyOf:
             - $ref: "#/components/schemas/E164Phone"
             - type: "null"
+        assignedMemberId:
+          type: [string, "null"]
+          format: uuid
         preferredWindows:
           type: array
           maxItems: 5
@@ -5001,13 +5367,16 @@ components:
         convertedProjectId:
           type: [string, "null"]
           format: uuid
+        convertedWorkOrderId:
+          type: [string, "null"]
+          format: uuid
         lockVersion:
           $ref: "#/components/schemas/LockVersion"
         createdAt:
           $ref: "#/components/schemas/Timestamp"
         updatedAt:
           $ref: "#/components/schemas/Timestamp"
-      required: [id, requestNo, customerId, locationId, assetId, source, status, priority, category, title, description, contactName, contactPhone, preferredWindows, triagedAt, convertedProjectId, lockVersion, createdAt, updatedAt]
+      required: [id, requestNo, customerId, locationId, assetId, source, status, priority, category, subject, title, description, contactName, contactPhone, assignedMemberId, preferredWindows, triagedAt, convertedProjectId, convertedWorkOrderId, lockVersion, createdAt, updatedAt]
     CreateServiceRequestRequest:
       type: object
       additionalProperties: false
@@ -5029,7 +5398,14 @@ components:
           type: string
           minLength: 1
           maxLength: 100
+        subject:
+          description: Canonical short summary of the request.
+          type: string
+          minLength: 1
+          maxLength: 200
         title:
+          description: Deprecated alias of subject, retained for backwards compatibility.
+          deprecated: true
           type: string
           minLength: 1
           maxLength: 200
@@ -5050,7 +5426,7 @@ components:
           maxItems: 5
           items:
             $ref: "#/components/schemas/PreferredTimeWindow"
-      required: [source, priority, category, title, description, contactName]
+      required: [source, priority, category, subject, description, contactName]
     UpdateServiceRequestRequest:
       type: object
       additionalProperties: false
@@ -5071,7 +5447,14 @@ components:
           type: string
           minLength: 1
           maxLength: 100
+        subject:
+          description: Canonical short summary of the request.
+          type: string
+          minLength: 1
+          maxLength: 200
         title:
+          description: Deprecated alias of subject, retained for backwards compatibility.
+          deprecated: true
           type: string
           minLength: 1
           maxLength: 200
@@ -5092,10 +5475,64 @@ components:
           maxItems: 5
           items:
             $ref: "#/components/schemas/PreferredTimeWindow"
+    PilotUpdateServiceRequestSummaryRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: >-
+        Content-only M3 summary patch. Status, internal note, original submission
+        and customer bindings are intentionally excluded; title is a deprecated
+        HTTP alias normalized to subject.
+      properties:
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 160
+        title:
+          description: Deprecated alias normalized to subject.
+          deprecated: true
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 10000
+        priority:
+          anyOf:
+            - $ref: "#/components/schemas/Priority"
+            - type: "null"
+        category:
+          type: [string, "null"]
+          minLength: 1
+          maxLength: 100
+        contactName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        contactPhone:
+          anyOf:
+            - $ref: "#/components/schemas/E164Phone"
+            - type: "null"
     TriageServiceRequestRequest:
       type: object
       additionalProperties: false
+      description: >-
+        Binds request context and moves new to triaged. customerId is required
+        by the triage RPC (TRIAGE_REQUIRES_CUSTOMER); locationId/assetId must be
+        scoped under the same customer. All other fields are optional overrides
+        applied during triage.
       properties:
+        customerId:
+          $ref: "#/components/schemas/Uuid"
+        locationId:
+          type: [string, "null"]
+          format: uuid
+        assetId:
+          type: [string, "null"]
+          format: uuid
+        assignedMemberId:
+          type: [string, "null"]
+          format: uuid
         priority:
           $ref: "#/components/schemas/Priority"
         category:
@@ -5105,7 +5542,7 @@ components:
         internalNote:
           type: [string, "null"]
           maxLength: 2000
-      required: [priority, category]
+      required: [customerId]
     MarkQuotedRequest:
       type: object
       additionalProperties: false
@@ -5113,41 +5550,60 @@ components:
         quoteId:
           $ref: "#/components/schemas/Uuid"
       required: [quoteId]
+    ConvertWorkOrderInput:
+      type: object
+      additionalProperties: false
+      description: Optional first work order created during conversion.
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        scheduledStartAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        scheduledEndAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+      required: [title]
     ConvertServiceRequestRequest:
       type: object
       additionalProperties: false
+      description: >-
+        Atomically converts a request. mode=singleVisit creates only a work
+        order; mode=project creates a project and optionally an initial work
+        order. workOrder is the single canonical input for both modes.
       properties:
+        mode:
+          type: string
+          enum: [singleVisit, project]
         projectTitle:
           type: string
           minLength: 1
           maxLength: 200
-        createInitialWorkOrder:
-          type: boolean
-          default: true
-        workOrderTitle:
-          type: [string, "null"]
-          maxLength: 200
-      required: [projectTitle, createInitialWorkOrder]
-    Conversion:
+        workOrder:
+          $ref: "#/components/schemas/ConvertWorkOrderInput"
+      required: [mode]
+    ConversionEnvelope:
       type: object
       additionalProperties: false
+      description: >-
+        Result of a conversion. project is null for singleVisit mode; workOrder
+        is null when no initial work order was created for a project.
       properties:
         serviceRequest:
           $ref: "#/components/schemas/ServiceRequest"
         project:
-          $ref: "#/components/schemas/Project"
+          anyOf:
+            - $ref: "#/components/schemas/Project"
+            - type: "null"
         workOrder:
           anyOf:
             - $ref: "#/components/schemas/WorkOrder"
             - type: "null"
       required: [serviceRequest, project, workOrder]
-    ConversionEnvelope:
-      type: object
-      additionalProperties: false
-      properties:
-        data:
-          $ref: "#/components/schemas/Conversion"
-      required: [data]
     ServiceRequestEnvelope:
       type: object
       additionalProperties: false
@@ -5166,6 +5622,364 @@ components:
         meta:
           $ref: "#/components/schemas/ListMeta"
       required: [data, meta]
+
+    PilotInboxItem:
+      type: object
+      additionalProperties: false
+      description: Exact M3 keyset inbox row returned by the implemented list route.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        referenceNo:
+          type: string
+          minLength: 1
+          maxLength: 40
+        source:
+          type: string
+          const: web
+        contactName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        contactPhone:
+          $ref: "#/components/schemas/E164Phone"
+        serviceName:
+          type: [string, "null"]
+          maxLength: 120
+        category:
+          type: [string, "null"]
+          maxLength: 120
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 10000
+        address:
+          type: [string, "null"]
+          maxLength: 1000
+        photoCount:
+          type: integer
+          minimum: 0
+        status:
+          $ref: "#/components/schemas/ServiceRequestStatus"
+        priority:
+          $ref: "#/components/schemas/Priority"
+        lockVersion:
+          $ref: "#/components/schemas/LockVersion"
+        customerId:
+          type: [string, "null"]
+          format: uuid
+        assignedMemberId:
+          type: [string, "null"]
+          format: uuid
+        triagedAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        createdAt:
+          $ref: "#/components/schemas/Timestamp"
+      required: [id, referenceNo, source, contactName, contactPhone, serviceName, category, title, description, address, photoCount, status, priority, lockVersion, customerId, assignedMemberId, triagedAt, createdAt]
+    PilotInboxListMeta:
+      type: object
+      additionalProperties: false
+      properties:
+        hasMore:
+          type: boolean
+        nextCursor:
+          type: [string, "null"]
+          maxLength: 1024
+      required: [hasMore, nextCursor]
+    PilotInboxListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/PilotInboxItem"
+        meta:
+          $ref: "#/components/schemas/PilotInboxListMeta"
+      required: [data, meta]
+    PilotOriginalSubmission:
+      type: [object, "null"]
+      description: Immutable staff-only snapshot captured when the customer submitted intake.
+      additionalProperties: true
+    PilotServiceRequestPhoto:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        category:
+          type: string
+          minLength: 1
+          maxLength: 40
+        url:
+          type: string
+          format: uri
+        expiresAt:
+          $ref: "#/components/schemas/Timestamp"
+      required: [id, category, url, expiresAt]
+    PilotServiceRequestPhotoListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/PilotServiceRequestPhoto"
+      required: [data]
+    PilotServiceRequestDetail:
+      type: object
+      additionalProperties: false
+      description: Exact manager-only M3 detail workspace DTO.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        requestNo:
+          type: string
+          minLength: 1
+          maxLength: 40
+        customerId:
+          type: [string, "null"]
+          format: uuid
+        locationId:
+          type: [string, "null"]
+          format: uuid
+        assetId:
+          type: [string, "null"]
+          format: uuid
+        source:
+          $ref: "#/components/schemas/ServiceRequestSource"
+        status:
+          $ref: "#/components/schemas/ServiceRequestStatus"
+        priority:
+          $ref: "#/components/schemas/Priority"
+        category:
+          type: [string, "null"]
+          maxLength: 100
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 160
+        title:
+          description: Deprecated alias that always mirrors subject.
+          deprecated: true
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 10000
+        contactName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        contactPhone:
+          anyOf:
+            - $ref: "#/components/schemas/E164Phone"
+            - type: "null"
+        contactEmail:
+          type: [string, "null"]
+          format: email
+          maxLength: 254
+        assignedMemberId:
+          type: [string, "null"]
+          format: uuid
+        internalNote:
+          type: string
+          maxLength: 2000
+        preferredWindows:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/PreferredTimeWindow"
+        originalSubmission:
+          $ref: "#/components/schemas/PilotOriginalSubmission"
+        summaryEditedBy:
+          type: [string, "null"]
+          format: uuid
+        summaryEditedAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        triagedAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        convertedAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        convertedProjectId:
+          type: [string, "null"]
+          format: uuid
+        convertedWorkOrderId:
+          type: [string, "null"]
+          format: uuid
+        convertedProjectNo:
+          type: [string, "null"]
+          maxLength: 40
+        convertedWorkOrderNo:
+          type: [string, "null"]
+          maxLength: 40
+        declineReason:
+          type: [string, "null"]
+          maxLength: 2000
+        cancellationReason:
+          type: [string, "null"]
+          maxLength: 2000
+        photos:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/PilotServiceRequestPhoto"
+        lockVersion:
+          $ref: "#/components/schemas/LockVersion"
+        createdAt:
+          $ref: "#/components/schemas/Timestamp"
+        updatedAt:
+          $ref: "#/components/schemas/Timestamp"
+      required: [id, requestNo, customerId, locationId, assetId, source, status, priority, category, subject, title, description, contactName, contactPhone, contactEmail, assignedMemberId, internalNote, preferredWindows, originalSubmission, summaryEditedBy, summaryEditedAt, triagedAt, convertedAt, convertedProjectId, convertedWorkOrderId, convertedProjectNo, convertedWorkOrderNo, declineReason, cancellationReason, photos, lockVersion, createdAt, updatedAt]
+    PilotServiceRequestDetailEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/PilotServiceRequestDetail"
+      required: [data]
+    PilotServiceRequestActionResult:
+      type: object
+      additionalProperties: false
+      description: Compact result returned by triage and status transition actions.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        status:
+          $ref: "#/components/schemas/ServiceRequestStatus"
+        priority:
+          $ref: "#/components/schemas/Priority"
+        category:
+          type: [string, "null"]
+          maxLength: 100
+        customerId:
+          type: [string, "null"]
+          format: uuid
+        locationId:
+          type: [string, "null"]
+          format: uuid
+        assetId:
+          type: [string, "null"]
+          format: uuid
+        assignedMemberId:
+          type: [string, "null"]
+          format: uuid
+        triagedAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        convertedAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        convertedProjectId:
+          type: [string, "null"]
+          format: uuid
+        convertedWorkOrderId:
+          type: [string, "null"]
+          format: uuid
+        lockVersion:
+          $ref: "#/components/schemas/LockVersion"
+        updatedAt:
+          $ref: "#/components/schemas/Timestamp"
+      required: [id, status, priority, category, customerId, locationId, assetId, assignedMemberId, triagedAt, convertedAt, convertedProjectId, convertedWorkOrderId, lockVersion, updatedAt]
+    PilotServiceRequestActionEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/PilotServiceRequestActionResult"
+      required: [data]
+    PilotConversionServiceRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        status:
+          type: string
+          const: converted
+        lockVersion:
+          $ref: "#/components/schemas/LockVersion"
+        convertedAt:
+          $ref: "#/components/schemas/Timestamp"
+      required: [id, status, lockVersion, convertedAt]
+    PilotConversionProject:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        projectNo:
+          type: string
+          minLength: 1
+          maxLength: 40
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        status:
+          type: string
+          minLength: 1
+          maxLength: 40
+      required: [id, projectNo, name, status]
+    PilotConversionWorkOrder:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        workOrderNo:
+          type: string
+          minLength: 1
+          maxLength: 40
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        status:
+          type: string
+          minLength: 1
+          maxLength: 40
+      required: [id, workOrderNo, title, status]
+    PilotConversionResult:
+      type: object
+      additionalProperties: false
+      properties:
+        serviceRequest:
+          $ref: "#/components/schemas/PilotConversionServiceRequest"
+        project:
+          anyOf:
+            - $ref: "#/components/schemas/PilotConversionProject"
+            - type: "null"
+        workOrder:
+          anyOf:
+            - $ref: "#/components/schemas/PilotConversionWorkOrder"
+            - type: "null"
+        replayed:
+          type: boolean
+      required: [serviceRequest, project, workOrder, replayed]
+    PilotConversionEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/PilotConversionResult"
+      required: [data]
 
     PublicIntakeConfiguration:
       type: object

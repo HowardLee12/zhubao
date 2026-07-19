@@ -190,7 +190,8 @@ Indexes：unique `(organization_id, asset_no)`；`(organization_id, location_id,
 | contact_name | text | 需求當下快照，`1..120` |
 | contact_phone / contact_email | text nullable | 至少一個聯絡方式，LINE source 可由 identity 取代 |
 | customer_line_identity_id | uuid nullable | LINE 來源關聯 |
-| subject | text | `1..160` |
+| subject | text | canonical，`1..160`；API DTO 對外用 `subject`，openapi `title` 為別名 |
+| category | text nullable | 產業服務類別；供 API DTO；triage 可覆寫 |
 | description | text default `` | 最大 10,000 |
 | priority | text default `normal` | `low/normal/high/urgent` |
 | status | text default `new` | `new/triaged/quoting/quoted/converted/declined/cancelled` |
@@ -198,6 +199,9 @@ Indexes：unique `(organization_id, asset_no)`；`(organization_id, location_id,
 | triaged_at / quoted_at / converted_at / closed_at | timestamptz nullable | 狀態時間 |
 | decline_reason / cancellation_reason | text nullable | 關閉必填 |
 | converted_project_id / converted_work_order_id | uuid nullable | convert 結果；至少一個 |
+| internal_note | text default `` | staff-only triage 備註，最大 2,000；不可回 public DTO |
+| original_submission | jsonb nullable | intake 寫入的不可變原始內容快照；guard trigger 阻止覆寫；triage/PATCH 不得改動 |
+| summary_edited_by / summary_edited_at | uuid / timestamptz nullable | 摘要最後編輯者與時間；PATCH 內容時更新，original 不動 |
 | metadata | jsonb default `{}` | intake 額外欄位，最大 32 KB |
 | 共通欄位 |  | timestamps、actor、lock |
 
@@ -704,6 +708,11 @@ org/{organization_id}/service-requests/{request_id}/{photo_id}/original.webp
 - `next_document_number`
 - `triage_service_request`
 - `convert_service_request`
+- `get_pilot_service_request_detail` / `update_pilot_service_request_summary`
+- `list_pilot_customers` / `list_pilot_customer_locations` / `list_pilot_customer_assets`
+- `create_pilot_customer`
+- `list_pilot_service_request_events`
+- `list_pilot_assignable_members`
 - `transition_work_order`
 - `create_quote_with_first_version`
 - `clone_quote_version`
@@ -718,6 +727,8 @@ org/{organization_id}/service-requests/{request_id}/{photo_id}/original.webp
 - `claim_line_webhook_events`
 
 每個 exposed RPC 必須：驗證 `auth.uid()`（公開 token RPC 除外）、組織、role、狀態、lock version；固定 search_path；禁止 dynamic SQL；失敗時 raise 可映射的 domain error code。
+
+Pilot staff route 不具 base-table privilege，也不得以 service role 補讀；detail/customer/event projection 由上述 authenticated-only RPC 回傳 allowlist JSON。`update_pilot_service_request_summary` 僅接受內容欄位、以 row lock 驗 `lock_version`、保留 `original_submission`，並在同一 transaction append `service_request.summary_updated` event。`create_pilot_customer` 驗 manager/tenant、以店家時區配發 `CU-YYYYMM-NNNNNN`，寫入 actor 並 append `customer.created`；events aggregate allowlist 因此包含 `customer`。
 
 ## 13. Index 與查詢驗證
 

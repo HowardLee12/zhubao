@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 import {
   createIdempotencyKey,
@@ -154,12 +155,12 @@ export function PilotOnboardingForm() {
             ) : null}
           </div>
 
-          <a
+          <Link
             href="/app/inbox"
             className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-orange px-4 text-sm font-bold text-white shadow-[0_10px_25px_rgba(226,105,31,0.22)]"
           >
             前往接案匣
-          </a>
+          </Link>
         </PilotCard>
       </PilotPage>
     );

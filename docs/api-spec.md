@@ -63,17 +63,14 @@
 - Mutable aggregate GET/PATCH/POST response 帶 `ETag: "3"`。
 - 每個 response 帶 `X-Request-ID`；如 client 傳合法 UUID request id 可沿用，否則 server 產生。
 
-列表：
+列表（keyset 深分頁；`meta` 為扁平結構，`nextCursor` 為 opaque base64 keyset cursor，綁定 tenant/route/sort/filter，到底時為 `null`）：
 
 ```json
 {
   "data": [],
   "meta": {
-    "page": {
-      "limit": 20,
-      "hasMore": false,
-      "nextCursor": null
-    }
+    "nextCursor": null,
+    "hasMore": false
   }
 }
 ```
@@ -183,6 +180,7 @@ Endpoint 表使用：
 | GET | `/organizations/{orgId}` | O/A/D/T/C/V | 組織摘要 |
 | PATCH | `/organizations/{orgId}` | O/A | 更新名稱、時區、模板、低風險設定；If-Match |
 | GET | `/organizations/{orgId}/memberships` | O/A/D/T/C/V | T/V 僅回 id、displayName、role、status |
+| GET | `/organizations/{orgId}/members` | O/A/D | Pilot 指派下拉專用；只回 active O/A/D/T 的 id、displayName、role、status |
 | POST | `/organizations/{orgId}/memberships` | O/A | 邀請；Idempotency-Key |
 | PATCH | `/organizations/{orgId}/memberships/{id}` | O/A | 改顯示資料；改 role/status 走 actions；If-Match |
 | POST | `.../memberships/{id}/actions/change-role` | O/A | 不可移除最後 owner；If-Match |
@@ -207,9 +205,11 @@ Endpoint 表使用：
 
 | Method | Path | 角色 | 規格摘要 |
 |---|---|---|---|
-| GET/POST | `/organizations/{orgId}/customers` | GET O/A/D/C/V；POST O/A/D | filter `q,kind,source,tag,updatedAfter`；建立 customer |
+| GET/POST | `/organizations/{orgId}/customers` | O/A/D | Pilot 已實作：GET `q,limit`；POST `{name,phone?}` 建立真實 customer、店內流水號與稽核事件 |
+| GET | `.../customers/similar` | O/A/D | triage 重複客戶 hint；query `phone`／`name`（至少一項）；tenant-scoped、hint-only 不自動合併 |
 | GET/PATCH/DELETE | `.../customers/{customerId}` | GET O/A/D/C/V/T*；write O/A/D | T 僅可讀 assigned work order 客戶；DELETE soft delete，If-Match |
 | GET/POST | `.../customers/{customerId}/locations` | O/A/D/V；T* read | 建立地址；POST If customer 未有 default，server 自動設 default |
+| GET | `.../customers/{customerId}/assets` | O/A/D | Pilot triage 用 customer-scoped 設備清單 |
 | GET/PATCH/DELETE | `.../locations/{locationId}` | O/A/D；V/T* read | DELETE 有 active work order 時回 409 |
 | GET/POST | `.../locations/{locationId}/assets` | O/A/D；T* read | filter `status,assetType` |
 | GET/PATCH/DELETE | `.../assets/{assetId}` | O/A/D；T* read | DELETE 等同 retired/soft delete，保留履歷 |
@@ -231,19 +231,30 @@ Customer create：
 
 Response 不預設展開 locations/assets；使用 `?include=defaultLocation` 時最多展開 allowlist 關聯，禁止任意 GraphQL 式 include。
 
+目前 M3 詳情頁的 inline create 採最小且已實作的 body：
+
+```json
+{ "name": "王先生", "phone": "+886912345678" }
+```
+
+伺服器固定建立 `individual/manual` customer，於同一 transaction 配發 `CU-YYYYMM-NNNNNN`、寫 actor 與 `customer.created` event，再回真實 UUID；不再使用 provisional 前端字串。上方完整 customer create 為後續 CRM CRUD 目標合約。
+
 ## 5. Service requests
 
 | Method | Path | 角色 | 規格摘要 |
 |---|---|---|---|
-| GET/POST | `/organizations/{orgId}/service-requests` | O/A/D/V；POST O/A/D | filter `status,priority,source,assignedMemberId,createdFrom,createdTo,q` |
-| GET/PATCH | `.../service-requests/{id}` | O/A/D/V；T* read | PATCH 僅內容，不可直接改 status；If-Match |
+| GET/POST | `/organizations/{orgId}/service-requests` | O/A/D；POST 為後續 | Pilot GET 已實作 `status,cursor,limit`；staff POST 仍是目標合約 |
+| GET/PATCH | `.../service-requests/{id}` | O/A/D | M3 manager workspace；PATCH 僅摘要內容，不可直接改 status；If-Match |
 | POST | `.../{id}/actions/triage` | O/A/D | 綁 customer/location/asset、負責人；If-Match |
 | POST | `.../{id}/actions/start-quoting` | O/A/D | new 必須先 triage |
 | POST | `.../{id}/actions/mark-quoted` | O/A/D | 需 sent quote version |
 | POST | `.../{id}/actions/convert` | O/A/D | 原子建立 project/work order；Idempotency + If-Match |
 | POST | `.../{id}/actions/decline` | O/A/D | `{reason}`；If-Match |
 | POST | `.../{id}/actions/cancel` | O/A/D | `{reason}`；If-Match |
-| GET | `.../{id}/events` | O/A/D/V/T* | cursor，依資源權限 |
+| GET | `.../{id}/events` | O/A/D | `afterSequence,limit`；回 redacted append-only timeline |
+| GET | `.../{id}/photos` | O/A/D | 回 private storage 短效 signed URL，不回 storage path |
+
+目前 Pilot 的 detail/PATCH、customer/location/asset confirmation list 與 events 皆透過 caller session 的 authenticated-only RPC；HTTP route 不得以 service role 直接查 domain table。PATCH 在 DB transaction 內驗 optimistic lock、留下摘要編輯者／時間與 append-only event；回應重新帶回完整時段與已簽照片，而非局部空陣列。
 
 建立需求：
 
@@ -264,6 +275,30 @@ Response 不預設展開 locations/assets；使用 `?include=defaultLocation` �
 }
 ```
 
+Triage request（綁定 context，`new → triaged`；`customerId` 必填，`locationId`／`assetId` 必屬同一 customer；`assignedMemberId` 僅能是 active owner/admin/dispatcher/technician；`internalNote` 為 staff-only 且會持久化；其餘為選填覆寫）：
+
+```json
+{
+  "customerId": "5f6a...",
+  "locationId": "8b1c...",
+  "assetId": null,
+  "assignedMemberId": "39796c68-3cd0-4aea-a8eb-b95f062e70c8",
+  "priority": "high",
+  "category": "cooling",
+  "internalNote": "已確認為住宅案"
+}
+```
+
+相似客戶 hint（`GET .../customers/similar?phone=&name=`）回 hint-only 陣列（無 `meta`），dispatcher 明確選連結既有或建立新，不自動合併：
+
+```json
+{
+  "data": [
+    { "customerId": "5f6a...", "customerNo": "C-000123", "name": "王先生", "phone": "+886912345678", "matchReason": "phone" }
+  ]
+}
+```
+
 Convert request：
 
 ```json
@@ -272,13 +307,12 @@ Convert request：
   "workOrder": {
     "title": "檢查主臥冷氣",
     "scheduledStartAt": "2026-07-18T01:00:00Z",
-    "scheduledEndAt": "2026-07-18T03:00:00Z",
-    "assigneeMembershipIds": ["39796c68-3cd0-4aea-a8eb-b95f062e70c8"]
+    "scheduledEndAt": "2026-07-18T03:00:00Z"
   }
 }
 ```
 
-`mode`：`singleVisit` 只建 work order；`project` 建 project，可同時以 `initialWorkOrder` 建首張工單。response 回所有 created resource ids。
+`mode`：`singleVisit` 只建 work order；`project` 建 project（`projectTitle` 選填），可同時以 `workOrder` 建首張工單。`workOrder` 為兩種 mode 共用的唯一輸入。M3 尚未在 conversion transaction 寫 assignment，因此 API 會拒絕 `assigneeMembershipIds`，不會假裝成功。response 為標準 `{ "data": { serviceRequest, project|null, workOrder|null, replayed } }`；同一進件重送相同 `Idempotency-Key` 時 `replayed=true` 且回既有 case，不重複建立。
 
 ## 6. Public intake
 

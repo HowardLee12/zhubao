@@ -180,9 +180,9 @@ Public DTO 必須獨立建立 allowlist mapper；禁止先序列化 internal DTO
 建立兩個不能互換的 server module：
 
 - `createUserSupabaseClient(request)`：帶使用者 session/JWT，受 RLS；一般 API 使用。
-- `createAdminSupabaseClient()`：service role，僅 webhook inbox、outbox worker、credential rotation、maintenance worker 使用。
+- `createAdminSupabaseClient()`：service role，僅 webhook／public capability gateway、outbox／maintenance worker、credential rotation，以及「已由 authenticated RPC 授權後」的 private Storage 短效 URL 簽發使用；一般 domain table 讀寫禁止使用。
 
-`createAdminSupabaseClient` 模組必須有 `server-only` guard，禁止被 client component import。Route handler 不得因 RLS error 改用 admin client retry。
+`createAdminSupabaseClient` 模組必須有 `server-only` guard，禁止被 client component import。Route handler 不得因 RLS error 改用 admin client retry。Storage signer 只能接收 authenticated RPC 回傳的 allowlisted photo metadata，不得自行以 service role 查 `photos` 或其他 domain table。
 
 ### 6.2 RLS 與 grants
 

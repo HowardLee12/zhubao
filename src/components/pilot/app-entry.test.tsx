@@ -16,11 +16,31 @@ const sessionUser = {
   displayName: "王老闆",
 };
 
+function membership(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "30000000-0000-4000-8000-000000000001",
+    organizationId: "20000000-0000-4000-8000-000000000001",
+    role: "owner",
+    status: "active",
+    displayName: "王老闆",
+    ...overrides,
+  };
+}
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "content-type": "application/json" },
   });
+}
+
+function stubSession(memberships: unknown[]) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(
+      jsonResponse({ data: { user: sessionUser, memberships } }),
+    ),
+  );
 }
 
 describe("PilotAppEntry", () => {
@@ -32,13 +52,8 @@ describe("PilotAppEntry", () => {
     vi.unstubAllGlobals();
   });
 
-  it("sends a signed-in owner without memberships to onboarding", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        jsonResponse({ data: { user: sessionUser, memberships: [] } }),
-      ),
-    );
+  it("sends a signed-in user without memberships to onboarding", async () => {
+    stubSession([]);
 
     render(<PilotAppEntry />);
 
@@ -46,30 +61,40 @@ describe("PilotAppEntry", () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/app/onboarding"));
   });
 
-  it("sends an active member to the persisted inbox", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        jsonResponse({
-          data: {
-            user: sessionUser,
-            memberships: [
-              {
-                id: "30000000-0000-4000-8000-000000000001",
-                organizationId: "20000000-0000-4000-8000-000000000001",
-                role: "owner",
-                status: "active",
-                displayName: "王老闆",
-              },
-            ],
-          },
-        }),
-      ),
-    );
+  it("sends an active technician to their own today screen", async () => {
+    stubSession([membership({ role: "technician" })]);
 
     render(<PilotAppEntry />);
 
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/app/inbox"));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/app/today"));
+  });
+
+  it("renders a manager hub instead of redirecting for an owner", async () => {
+    stubSession([membership({ role: "owner" })]);
+
+    render(<PilotAppEntry />);
+
+    expect(await screen.findByRole("heading", { name: /工作台/ })).toBeInTheDocument();
+    // The manager stays on /app; the hub is rendered rather than a redirect.
+    expect(router.replace).not.toHaveBeenCalled();
+
+    const inbox = screen.getByRole("link", { name: /接案匣/ });
+    expect(inbox).toHaveAttribute("href", "/app/inbox");
+    expect(screen.getByRole("link", { name: /排程/ })).toHaveAttribute("href", "/app/schedule");
+    expect(screen.getByRole("link", { name: /成員/ })).toHaveAttribute(
+      "href",
+      "/app/settings/team",
+    );
+    expect(screen.getByRole("link", { name: /設定/ })).toHaveAttribute("href", "/app/settings");
+  });
+
+  it("renders the hub for a dispatcher too", async () => {
+    stubSession([membership({ role: "dispatcher" })]);
+
+    render(<PilotAppEntry />);
+
+    expect(await screen.findByRole("link", { name: /接案匣/ })).toBeInTheDocument();
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("shows a recoverable error and retries session resolution", async () => {

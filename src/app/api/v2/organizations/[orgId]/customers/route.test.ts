@@ -84,6 +84,30 @@ describe("GET .../customers", () => {
     expect(response.status).toBe(403);
     expect(rpc).not.toHaveBeenCalled();
   });
+
+  it("rejects a malformed organization id before authorizing (422)", async () => {
+    const response = await GET(new Request("https://renoly.test/x"), {
+      params: Promise.resolve({ orgId: "not-a-uuid" }),
+    });
+    expect(response.status).toBe(422);
+    expect(authorize).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("maps a FORBIDDEN list RPC error to 403", async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { message: "FORBIDDEN" } });
+
+    const response = await GET(new Request("https://renoly.test/x"), params);
+    expect(response.status).toBe(403);
+    expect((await response.json()).code).toBe("FORBIDDEN");
+  });
+
+  it("returns 500 when a list row fails the customer DTO contract", async () => {
+    rpc.mockResolvedValueOnce({ data: [{ id: "not-a-uuid" }], error: null });
+
+    const response = await GET(new Request("https://renoly.test/x"), params);
+    expect(response.status).toBe(500);
+  });
 });
 
 describe("POST .../customers", () => {
@@ -140,5 +164,66 @@ describe("POST .../customers", () => {
 
     expect(response.status).toBe(422);
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a cross-origin create before authorizing or writing", async () => {
+    const response = await POST(
+      new Request("https://renoly.test/api/v2/organizations/x/customers", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://evil.example",
+          cookie: "renoly-csrf=0123456789abcdef0123456789abcdef",
+          "x-csrf-token": "0123456789abcdef0123456789abcdef",
+        },
+        body: JSON.stringify({ name: "示範客戶甲", phone: "+886912345678" }),
+      }),
+      params,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).code).toBe("CSRF_INVALID");
+    expect(authorize).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("maps a cross-tenant create RPC error to a non-leaky 403", async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { message: "FORBIDDEN" } });
+
+    const response = await POST(
+      new Request("https://renoly.test/api/v2/organizations/x/customers", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://renoly.test",
+          cookie: "renoly-csrf=0123456789abcdef0123456789abcdef",
+          "x-csrf-token": "0123456789abcdef0123456789abcdef",
+        },
+        body: JSON.stringify({ name: "示範客戶甲", phone: "+886912345678" }),
+      }),
+      params,
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("returns 500 when the created row fails the customer DTO contract", async () => {
+    rpc.mockResolvedValueOnce({ data: { id: "not-a-uuid" }, error: null });
+
+    const response = await POST(
+      new Request("https://renoly.test/api/v2/organizations/x/customers", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://renoly.test",
+          cookie: "renoly-csrf=0123456789abcdef0123456789abcdef",
+          "x-csrf-token": "0123456789abcdef0123456789abcdef",
+        },
+        body: JSON.stringify({ name: "示範客戶甲", phone: "+886912345678" }),
+      }),
+      params,
+    );
+
+    expect(response.status).toBe(500);
   });
 });

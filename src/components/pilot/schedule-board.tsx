@@ -160,6 +160,12 @@ export function ScheduleBoard({ now = defaultNow }: Readonly<{ now?: () => Date 
   return (
     <PilotPage>
       <PilotBrand eyebrow="排程板" />
+      <Link
+        href="/app"
+        className="mb-4 inline-flex min-h-10 items-center text-sm font-bold text-orange-deep"
+      >
+        ← 回工作台
+      </Link>
       <div className="mb-4">
         <PilotInlineNotice tone="info">
           排程與派工通知尚未自動發送，將於下一階段開放。

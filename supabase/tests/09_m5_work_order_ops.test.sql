@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(76);
+select plan(80);
 
 ------------------------------------------------------------------------------
 -- Fixtures. Fresh, fully-bound work orders so the shared seed WO stays intact.
@@ -732,6 +732,144 @@ select throws_ok(
 select throws_ok(
   $$select public.complete_work_order_checklist('20000000-0000-4000-8000-000000000001', current_setting('test.m5_delcl')::uuid, 4, null)$$,
   '23514', 'REQUIRED_CHECKLIST_INCOMPLETE', 'complete_work_order_checklist blocks while the photo item has only a soft-deleted photo'
+);
+
+reset role;
+
+------------------------------------------------------------------------------
+-- Completion gate relax (202607200001): a work order with NO checklist may
+-- complete on before + after photos + a non-empty summary alone. Previously the
+-- private.require_completion_snapshot() trigger raised CHECKLIST_SNAPSHOT_REQUIRED
+-- for any completion with zero work_order_checklists rows. Dropping that trigger
+-- must NOT weaken the authoritative gate inside transition_work_order: a work
+-- order WITH an unanswered required checklist item still blocks, and a missing
+-- after photo still blocks. Fresh WO ..0006 in Alpha, marched to on_site.
+------------------------------------------------------------------------------
+
+insert into public.work_orders (
+  id, organization_id, work_order_no, customer_id, location_id, title, status,
+  scheduled_start_at, scheduled_end_at, lock_version, created_by, updated_by
+) values (
+  '82050000-0000-4000-8000-000000000006', '20000000-0000-4000-8000-000000000001',
+  'W-M5-0006', '40000000-0000-4000-8000-000000000001',
+  '50000000-0000-4000-8000-000000000001', 'M5 無檢查表完工工單', 'scheduled',
+  '2026-09-10 01:00:00+00', '2026-09-10 03:00:00+00', 1,
+  '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002'
+);
+insert into public.assignments (
+  id, organization_id, work_order_id, membership_id, duty, status, assigned_by, created_by, updated_by
+) values (
+  '83050000-0000-4000-8000-000000000006', '20000000-0000-4000-8000-000000000001',
+  '82050000-0000-4000-8000-000000000006', '30000000-0000-4000-8000-000000000003',
+  'lead', 'assigned', '10000000-0000-4000-8000-000000000002',
+  '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002'
+);
+
+set local role authenticated;
+-- march to on_site: dispatched (1->2), en_route (2->3), on_site (3->4)
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000002', true);
+select public.transition_work_order_safe('20000000-0000-4000-8000-000000000001', '82050000-0000-4000-8000-000000000006', 'dispatched', 1, statement_timestamp());
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000003', true);
+select public.transition_work_order_safe('20000000-0000-4000-8000-000000000001', '82050000-0000-4000-8000-000000000006', 'en_route', 2, statement_timestamp());
+select public.transition_work_order_safe('20000000-0000-4000-8000-000000000001', '82050000-0000-4000-8000-000000000006', 'on_site', 3, statement_timestamp());
+
+-- confirm the precondition of the bug: this work order has NO checklist at all
+reset role;
+select ok(
+  not exists (
+    select 1 from public.work_order_checklists
+    where work_order_id = '82050000-0000-4000-8000-000000000006'
+  ), 'the relax-gate work order genuinely has no checklist snapshot'
+);
+
+-- (c) a ready BEFORE photo only -> the missing AFTER photo still blocks completion
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000003', true);
+select set_config('test.m5_nobefore', (
+  select public.create_photo_upload(
+    '20000000-0000-4000-8000-000000000001', 'work_order', '82050000-0000-4000-8000-000000000006',
+    'before', 'nb.jpg', 'image/jpeg', 1000, '4444444444444444444444444444444444444444444444444444444444444444'
+  ) ->> 'photoId'), true);
+select public.complete_work_order_photo('20000000-0000-4000-8000-000000000001', current_setting('test.m5_nobefore')::uuid, 'image/jpeg', 1000, '4444444444444444444444444444444444444444444444444444444444444444', 100, 100, null);
+select throws_ok(
+  $$select public.transition_work_order_safe('20000000-0000-4000-8000-000000000001', '82050000-0000-4000-8000-000000000006', 'completed', 4, statement_timestamp(), null, '完工摘要')$$,
+  '23514', 'BEFORE_AFTER_PHOTOS_REQUIRED', 'a checklist-free work order still cannot complete without an after photo'
+);
+
+-- (a) add the ready AFTER photo -> now completes on photos + summary ALONE, with
+-- NO checklist (previously CHECKLIST_SNAPSHOT_REQUIRED from the dropped trigger).
+select set_config('test.m5_noafter', (
+  select public.create_photo_upload(
+    '20000000-0000-4000-8000-000000000001', 'work_order', '82050000-0000-4000-8000-000000000006',
+    'after', 'na.jpg', 'image/jpeg', 1000, '5555555555555555555555555555555555555555555555555555555555555555'
+  ) ->> 'photoId'), true);
+select public.complete_work_order_photo('20000000-0000-4000-8000-000000000001', current_setting('test.m5_noafter')::uuid, 'image/jpeg', 1000, '5555555555555555555555555555555555555555555555555555555555555555', 100, 100, null);
+select is(
+  public.transition_work_order_safe('20000000-0000-4000-8000-000000000001', '82050000-0000-4000-8000-000000000006', 'completed', 4, statement_timestamp(), null, '簡單維修完成') ->> 'status',
+  'completed', 'a work order with NO checklist completes on before + after photos + summary alone'
+);
+
+------------------------------------------------------------------------------
+-- (b) proving we did NOT over-relax: a work order WITH a required checklist item
+-- left unanswered still blocks on REQUIRED_CHECKLIST_INCOMPLETE, even with both
+-- before + after ready photos and a summary. Fresh WO ..0007 in Alpha.
+------------------------------------------------------------------------------
+
+reset role;
+insert into public.work_orders (
+  id, organization_id, work_order_no, customer_id, location_id, title, status,
+  scheduled_start_at, scheduled_end_at, lock_version, created_by, updated_by
+) values (
+  '82050000-0000-4000-8000-000000000007', '20000000-0000-4000-8000-000000000001',
+  'W-M5-0007', '40000000-0000-4000-8000-000000000001',
+  '50000000-0000-4000-8000-000000000001', 'M5 有檢查表仍阻擋完工工單', 'scheduled',
+  '2026-09-11 01:00:00+00', '2026-09-11 03:00:00+00', 1,
+  '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002'
+);
+insert into public.assignments (
+  id, organization_id, work_order_id, membership_id, duty, status, assigned_by, created_by, updated_by
+) values (
+  '83050000-0000-4000-8000-000000000007', '20000000-0000-4000-8000-000000000001',
+  '82050000-0000-4000-8000-000000000007', '30000000-0000-4000-8000-000000000003',
+  'lead', 'assigned', '10000000-0000-4000-8000-000000000002',
+  '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000002', true);
+select public.transition_work_order_safe('20000000-0000-4000-8000-000000000001', '82050000-0000-4000-8000-000000000007', 'dispatched', 1, statement_timestamp());
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000003', true);
+select public.transition_work_order_safe('20000000-0000-4000-8000-000000000001', '82050000-0000-4000-8000-000000000007', 'en_route', 2, statement_timestamp());
+select public.transition_work_order_safe('20000000-0000-4000-8000-000000000001', '82050000-0000-4000-8000-000000000007', 'on_site', 3, statement_timestamp());
+
+-- required TEXT checklist item, deliberately left unanswered. Checklist creation
+-- is a manager action, so switch to the dispatcher.
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000002', true);
+select public.create_work_order_checklist(
+  '20000000-0000-4000-8000-000000000001', '82050000-0000-4000-8000-000000000007',
+  '完工檢查', '[{"label":"確認排水正常","responseType":"text","isRequired":true,"evidenceRequired":false}]'::jsonb, null
+);
+
+-- ready before + ready after photos (so ONLY the checklist gate can block)
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000003', true);
+select set_config('test.m5_reqbefore', (
+  select public.create_photo_upload(
+    '20000000-0000-4000-8000-000000000001', 'work_order', '82050000-0000-4000-8000-000000000007',
+    'before', 'rb.jpg', 'image/jpeg', 1000, '6666666666666666666666666666666666666666666666666666666666666666'
+  ) ->> 'photoId'), true);
+select public.complete_work_order_photo('20000000-0000-4000-8000-000000000001', current_setting('test.m5_reqbefore')::uuid, 'image/jpeg', 1000, '6666666666666666666666666666666666666666666666666666666666666666', 100, 100, null);
+select set_config('test.m5_reqafter', (
+  select public.create_photo_upload(
+    '20000000-0000-4000-8000-000000000001', 'work_order', '82050000-0000-4000-8000-000000000007',
+    'after', 'ra.jpg', 'image/jpeg', 1000, '7777777777777777777777777777777777777777777777777777777777777777'
+  ) ->> 'photoId'), true);
+select public.complete_work_order_photo('20000000-0000-4000-8000-000000000001', current_setting('test.m5_reqafter')::uuid, 'image/jpeg', 1000, '7777777777777777777777777777777777777777777777777777777777777777', 100, 100, null);
+
+-- NEGATIVE: the required text item is still unanswered, so completion stays
+-- blocked -- proving the relax migration did not over-loosen the gate.
+select throws_ok(
+  $$select public.transition_work_order_safe('20000000-0000-4000-8000-000000000001', '82050000-0000-4000-8000-000000000007', 'completed', 4, statement_timestamp(), null, '完工摘要')$$,
+  '23514', 'REQUIRED_CHECKLIST_INCOMPLETE', 'a work order WITH an unanswered required checklist item still blocks completion after the relax migration'
 );
 
 reset role;

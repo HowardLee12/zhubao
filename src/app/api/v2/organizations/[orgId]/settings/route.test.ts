@@ -115,4 +115,109 @@ describe("pilot organization settings route", () => {
     expect(response.status).toBe(401);
     expect(rpc).not.toHaveBeenCalled();
   });
+
+  it("rejects a malformed organization id before the RPC (422)", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: crypto.randomUUID() } }, error: null });
+
+    const response = await GET(new Request("https://renoly.test/x"), {
+      params: Promise.resolve({ orgId: "not-a-uuid" }),
+    });
+
+    expect(response.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("maps a FORBIDDEN RPC error on read to 403", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: crypto.randomUUID() } }, error: null });
+    rpc.mockResolvedValue({ data: null, error: { message: "FORBIDDEN: not a manager" } });
+
+    const response = await GET(new Request("https://renoly.test/x"), {
+      params: Promise.resolve({ orgId }),
+    });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).code).toBe("FORBIDDEN");
+  });
+
+  it("maps an AUTH_REQUIRED RPC error on read to 401", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: crypto.randomUUID() } }, error: null });
+    rpc.mockResolvedValue({ data: null, error: { details: "AUTH_REQUIRED" } });
+
+    const response = await GET(new Request("https://renoly.test/x"), {
+      params: Promise.resolve({ orgId }),
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("maps a STALE_VERSION RPC error on update to 409", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: crypto.randomUUID() } }, error: null });
+    rpc.mockResolvedValue({ data: null, error: { message: "STALE_VERSION" } });
+
+    const response = await PATCH(
+      patchRequest({
+        name: "北城到府工程",
+        intakeHeadline: settings.intakeHeadline,
+        privacyNotice: settings.privacyNotice,
+        lockVersion: 1,
+      }),
+      { params: Promise.resolve({ orgId }) },
+    );
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).code).toBe("STALE_VERSION");
+  });
+
+  it("maps an unrecognized RPC error to a non-leaky 500", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: crypto.randomUUID() } }, error: null });
+    rpc.mockResolvedValue({ data: null, error: { message: "boom", details: "pg internal" } });
+
+    const response = await GET(new Request("https://renoly.test/x"), {
+      params: Promise.resolve({ orgId }),
+    });
+
+    expect(response.status).toBe(500);
+    const body = JSON.stringify(await response.json());
+    expect(body).not.toMatch(/pg internal/);
+  });
+
+  it("returns 500 when the RPC row fails the DTO contract on read", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: crypto.randomUUID() } }, error: null });
+    rpc.mockResolvedValue({ data: { organizationId: orgId, name: "" }, error: null });
+
+    const response = await GET(new Request("https://renoly.test/x"), {
+      params: Promise.resolve({ orgId }),
+    });
+
+    expect(response.status).toBe(500);
+  });
+
+  it("returns 500 when the update RPC row fails the DTO contract", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: crypto.randomUUID() } }, error: null });
+    rpc.mockResolvedValue({ data: { lockVersion: "not-a-number" }, error: null });
+
+    const response = await PATCH(
+      patchRequest({
+        name: "北城到府工程",
+        intakeHeadline: settings.intakeHeadline,
+        privacyNotice: settings.privacyNotice,
+        lockVersion: 1,
+      }),
+      { params: Promise.resolve({ orgId }) },
+    );
+
+    expect(response.status).toBe(500);
+  });
+
+  it("rejects an invalid update payload before the RPC (422)", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: crypto.randomUUID() } }, error: null });
+
+    const response = await PATCH(
+      patchRequest({ name: "", intakeHeadline: "", privacyNotice: "", lockVersion: 0 }),
+      { params: Promise.resolve({ orgId }) },
+    );
+
+    expect(response.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
 });

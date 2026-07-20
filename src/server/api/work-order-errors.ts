@@ -78,6 +78,12 @@ const UNPROCESSABLE_SIGNALS = [
   "REQUIRED_CHECKLIST_INCOMPLETE",
   "REQUIRED_EVIDENCE_MISSING",
   "BEFORE_AFTER_PHOTOS_REQUIRED",
+  "MISSING_BEFORE_PHOTO",
+  "MISSING_AFTER_PHOTO",
+  // Superseded by the M5 completion-gate relax (202607200001), which dropped the
+  // require_completion_snapshot trigger. Kept here so any residual path still
+  // surfaces a clear 422 instead of a 500.
+  "CHECKLIST_SNAPSHOT_REQUIRED",
   "CUSTOMER_SIGNOFF_REQUIRED",
   "ASSIGNMENT_CANCEL_REASON_REQUIRED",
   "DECLINE_REASON_REQUIRED",

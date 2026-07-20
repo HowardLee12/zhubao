@@ -113,8 +113,13 @@ export async function onboardOwner(
 
   const verificationUrl = await waitForMagicLink(request, params.ownerEmail);
   await page.goto(verificationUrl);
-  await expect(page).toHaveURL(/\/app(?:\/onboarding)?(?:\?.*)?$/, { timeout: 20_000 });
-  await expect(page.getByRole("heading", { name: "建立你的工作空間" })).toBeVisible();
+  // A brand-new owner lands on /app (loading) then app-entry redirects to
+  // /app/onboarding; wait for that URL before asserting the heading so the
+  // redirect chain isn't raced by the default 5s assertion.
+  await page.waitForURL(/\/app\/onboarding(?:\?.*)?$/, { timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "建立你的工作空間" })).toBeVisible({
+    timeout: 20_000,
+  });
 
   await page.getByLabel("店家名稱").fill(params.organizationName);
   await page.getByLabel("網址代稱").fill(params.organizationSlug);
@@ -177,7 +182,9 @@ export async function createConvertedWorkOrder(
     address: "台北市信義區松高路 68 號",
   });
 
-  await page.goto("/app");
+  // /app renders a manager hub (nav cards) rather than auto-redirecting to the
+  // inbox; navigate straight to the inbox surface the rest of this flow needs.
+  await page.goto("/app/inbox");
   await expect(page).toHaveURL(/\/app\/inbox(?:\?.*)?$/, { timeout: 20_000 });
   await page.getByRole("link", { name: "查看並整理進件" }).first().click();
   await expect(page).toHaveURL(/\/app\/inbox\/[0-9a-f-]+$/, { timeout: 20_000 });

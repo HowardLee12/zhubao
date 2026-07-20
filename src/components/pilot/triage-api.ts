@@ -449,10 +449,18 @@ export async function fetchCustomerAssets(
   return envelope.data;
 }
 
+/**
+ * `assignable` (default) returns active operational members for the triage
+ * assignment picker; `all` returns the full team roster (incl. invited/suspended)
+ * for the team-management screen. The scope is optional so existing callers keep
+ * their active-only behaviour.
+ */
 export async function fetchOrganizationMembers(
   organizationId: string,
+  scope: "assignable" | "all" = "assignable",
 ): Promise<OrganizationMember[]> {
-  const response = await fetch(`${orgPath(organizationId)}/members`, {
+  const query = scope === "all" ? "?scope=all" : "";
+  const response = await fetch(`${orgPath(organizationId)}/members${query}`, {
     method: "GET",
     headers: { Accept: "application/json" },
   });

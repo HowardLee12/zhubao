@@ -56,6 +56,26 @@ describe("mapWorkOrderRpcError", () => {
     }
   });
 
+  it("maps every completion-gate signal to a clear 422, never a 500", () => {
+    // These are the completion evidence codes raised by transition_work_order /
+    // force_complete_work_order plus the superseded CHECKLIST_SNAPSHOT_REQUIRED.
+    // A user hitting an unmet completion precondition must see 422, not 500.
+    for (const message of [
+      "COMPLETION_SUMMARY_REQUIRED",
+      "REQUIRED_CHECKLIST_INCOMPLETE",
+      "REQUIRED_EVIDENCE_MISSING",
+      "BEFORE_AFTER_PHOTOS_REQUIRED",
+      "MISSING_BEFORE_PHOTO",
+      "MISSING_AFTER_PHOTO",
+      "CHECKLIST_SNAPSHOT_REQUIRED",
+      "CUSTOMER_SIGNOFF_REQUIRED",
+    ]) {
+      const problem = mapWorkOrderRpcError({ message });
+      expect(problem.status, message).toBe(422);
+      expect(problem.code, message).toBe("VALIDATION_FAILED");
+    }
+  });
+
   it("maps state/limit conflicts to 409", () => {
     for (const message of [
       "WORK_ORDER_NOT_SCHEDULABLE",

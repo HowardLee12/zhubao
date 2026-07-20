@@ -198,6 +198,21 @@ export function PilotSettings() {
         </p>
       </header>
 
+      <Link
+        href="/app/settings/team"
+        className="mb-5 flex items-center justify-between gap-4 rounded-[22px] border border-warm-border bg-white p-5 shadow-[0_14px_36px_rgba(74,45,20,0.07)] transition hover:border-orange/40"
+      >
+        <span className="min-w-0">
+          <span className="block text-lg font-black text-ink">成員</span>
+          <span className="mt-1 block text-sm leading-6 text-ink-3">
+            新增技師、管理團隊角色與狀態。
+          </span>
+        </span>
+        <span aria-hidden="true" className="shrink-0 text-xl font-black text-orange">
+          →
+        </span>
+      </Link>
+
       <PilotCard>
         <form aria-label="店家設定" className="space-y-5" onSubmit={save}>
           <Field>

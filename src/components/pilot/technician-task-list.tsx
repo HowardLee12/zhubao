@@ -150,6 +150,12 @@ export function TechnicianTaskList() {
   return (
     <PilotPage>
       <PilotBrand eyebrow="我的工單" />
+      <Link
+        href="/app/today"
+        className="mb-4 inline-flex min-h-10 items-center text-sm font-bold text-orange-deep"
+      >
+        ← 回今日
+      </Link>
       <div
         role="tablist"
         aria-label="工單狀態"

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { fetchPilotInbox, fetchPilotSession, PilotApiError, type PilotInboxItem } from "./api";
@@ -194,6 +195,12 @@ export function PilotInbox({ now = defaultNow }: Readonly<{ now?: () => Date }>)
           <p className="mt-2 text-sm leading-6 text-ink-3">
             接案匣只開放給有派工權限的成員（負責人、管理員或派工員）。若你需要處理進件，請聯絡店家管理員調整你的角色。
           </p>
+          <Link
+            href="/app/my-work-orders"
+            className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-orange px-4 text-sm font-bold text-white shadow-[0_10px_25px_rgba(226,105,31,0.22)] transition hover:bg-orange-deep"
+          >
+            前往我的工單 →
+          </Link>
         </PilotCard>
       ) : null}
       {state.status === "ready" ? (

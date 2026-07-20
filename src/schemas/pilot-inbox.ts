@@ -32,7 +32,14 @@ const pilotInboxRpcItemSchema = z
     id: z.uuid(),
     requestNo: z.string().min(1).max(40),
     contactName: z.string().min(1).max(120),
-    contactPhone: z.string().regex(/^\+[1-9][0-9]{7,14}$/),
+    // Nullable: a LINE-sourced request (M7) is contacted via its LINE identity and
+    // legitimately has no phone; a web request always carries an E.164 number. A
+    // null must not blank the whole inbox, so tolerate it and validate the format
+    // only when present.
+    contactPhone: z
+      .string()
+      .regex(/^\+[1-9][0-9]{7,14}$/)
+      .nullable(),
     subject: z.string().min(1).max(160),
     description: z.string().max(10_000),
     status: serviceRequestStatusSchema,
@@ -85,7 +92,7 @@ export interface PilotInboxItem {
   referenceNo: string;
   source: PilotInboxSource;
   contactName: string;
-  contactPhone: string;
+  contactPhone: string | null;
   serviceName: string | null;
   category: string | null;
   title: string;

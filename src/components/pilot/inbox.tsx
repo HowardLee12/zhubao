@@ -366,12 +366,16 @@ export function PilotInbox({ now = defaultNow }: Readonly<{ now?: () => Date }>)
                         <div className="flex gap-2">
                           <dt className="w-14 shrink-0 font-semibold text-ink-3">電話</dt>
                           <dd className="font-bold text-ink-2">
-                            <a
-                              href={`tel:${item.contactPhone}`}
-                              className="text-orange-deep underline"
-                            >
-                              {item.contactPhone}
-                            </a>
+                            {item.contactPhone ? (
+                              <a
+                                href={`tel:${item.contactPhone}`}
+                                className="text-orange-deep underline"
+                              >
+                                {item.contactPhone}
+                              </a>
+                            ) : (
+                              <span className="text-ink-3">未提供</span>
+                            )}
                           </dd>
                         </div>
                         <div className="flex gap-2">

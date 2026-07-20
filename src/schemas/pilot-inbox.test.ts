@@ -47,6 +47,25 @@ describe("pilotInboxRpcResultSchema", () => {
     expect(pilotInboxRpcResultSchema.parse(result)).toEqual(result);
   });
 
+  it("accepts a null contactPhone (a LINE-sourced request has no phone) without failing the whole envelope", () => {
+    const lineRow = { ...row, contactPhone: null };
+    expect(
+      pilotInboxRpcResultSchema.parse({
+        organizationId: result.organizationId,
+        items: [lineRow],
+      }).items[0].contactPhone,
+    ).toBeNull();
+  });
+
+  it("still rejects a malformed non-null contactPhone", () => {
+    expect(() =>
+      pilotInboxRpcResultSchema.parse({
+        organizationId: result.organizationId,
+        items: [{ ...row, contactPhone: "0912345678" }],
+      }),
+    ).toThrow();
+  });
+
   it("accepts the triage provenance fields on a triaged row", () => {
     const triaged = {
       ...row,

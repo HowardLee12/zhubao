@@ -113,14 +113,14 @@ describe("DispatcherWorkOrderDetail", () => {
     await screen.findByRole("button", { name: "派工給師傅" });
   });
 
-  it("dispatches and surfaces the honest not-sent notification", async () => {
+  it("dispatches and shows the confirmation notice (dispatch enqueues no LINE notice)", async () => {
     pilotApi.fetchPilotSession.mockResolvedValue(session("dispatcher"));
     woApi.fetchWorkOrderDetail
       .mockResolvedValueOnce(detail({ status: "scheduled", lockVersion: 2 }))
       .mockResolvedValueOnce(detail({ status: "dispatched", lockVersion: 3 }));
     woApi.transitionWorkOrder.mockResolvedValue({
       data: { status: "dispatched", lockVersion: 3 },
-      notification: { status: "not_sent", reason: "x" },
+      notification: null,
     });
     render(<DispatcherWorkOrderDetail workOrderId={workOrderId} />);
 
@@ -128,7 +128,9 @@ describe("DispatcherWorkOrderDetail", () => {
     await userEvent.click(screen.getByRole("button", { name: "派工給師傅" }));
     await waitFor(() => expect(woApi.transitionWorkOrder).toHaveBeenCalledTimes(1));
     expect(woApi.transitionWorkOrder.mock.calls[0][3]).toBe("dispatch");
-    await screen.findByText(/通知尚未自動發送/);
+    // The confirmation notice appears; a non-completing transition adds no LINE line.
+    await screen.findByText("已派工。");
+    expect(screen.queryByText(/已排入 LINE 通知/)).toBeNull();
   });
 
   it("offers force-complete only to owner/admin on an on-site work order", async () => {
@@ -218,7 +220,7 @@ describe("DispatcherWorkOrderDetail", () => {
       .mockResolvedValueOnce(detail({ status: "completed", lockVersion: 5, customerSignedAt: null }));
     woApi.forceCompleteWorkOrder.mockResolvedValue({
       data: detail({ status: "completed", customerSignedAt: null }),
-      notification: { status: "not_sent", reason: "x" },
+      notification: { status: "queued", channel: "line" },
     });
     render(<DispatcherWorkOrderDetail workOrderId={workOrderId} />);
 

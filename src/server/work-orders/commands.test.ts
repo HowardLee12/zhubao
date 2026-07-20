@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveTransitionFacts, NOT_SENT_NOTIFICATION, type WorkOrderDetail } from "./commands";
+import { deriveTransitionFacts, QUEUED_NOTIFICATION, type WorkOrderDetail } from "./commands";
 
 const detail: WorkOrderDetail = {
   status: "on_site",
@@ -45,11 +45,11 @@ describe("deriveTransitionFacts", () => {
   });
 });
 
-describe("NOT_SENT_NOTIFICATION", () => {
-  it("declares deferral to M6", () => {
-    expect(NOT_SENT_NOTIFICATION).toEqual({
-      status: "not_sent",
-      reason: "line_delivery_deferred_to_m6",
+describe("QUEUED_NOTIFICATION", () => {
+  it("reports the LINE outbox queued status (not sent — the outbox is the truth)", () => {
+    expect(QUEUED_NOTIFICATION).toEqual({
+      status: "queued",
+      channel: "line",
     });
   });
 });

@@ -49,6 +49,14 @@ const child = spawn(command, args, {
     PUBLIC_TOKEN_PEPPER:
       process.env.PUBLIC_TOKEN_PEPPER ?? "renoly-local-public-token-pepper-2026-only",
     AUTH_SECRET: process.env.AUTH_SECRET ?? "renoly-local-auth-secret-2026-not-production",
+    // M6 LINE credential envelope key (base64 of 32 bytes) — local/dev only, never a
+    // production key. Required by the connect route + webhook/worker decrypt seams.
+    LINE_CREDENTIAL_MASTER_KEY_V1:
+      process.env.LINE_CREDENTIAL_MASTER_KEY_V1 ??
+      Buffer.from("renoly-local-line-master-key-32!").toString("base64"),
+    // M6 internal worker shared secret — local/dev only.
+    WORKER_SECRET:
+      process.env.WORKER_SECRET ?? "renoly-local-worker-secret-2026-not-production",
     PLAYWRIGHT_BASE_URL: process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3100",
     LOCAL_MAIL_URL: local.MAILPIT_URL ?? local.INBUCKET_URL ?? "http://127.0.0.1:55324",
     // pilot-live-intake.spec.ts reads PILOT_MAIL_SERVER_URL to locate the local

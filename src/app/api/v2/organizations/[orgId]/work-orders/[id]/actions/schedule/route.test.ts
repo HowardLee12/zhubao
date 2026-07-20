@@ -99,8 +99,8 @@ describe("schedule action route", () => {
     const body = await response.json();
     expect(body.data.status).toBe("scheduled");
     expect(body.notification).toEqual({
-      status: "not_sent",
-      reason: "line_delivery_deferred_to_m6",
+      status: "queued",
+      channel: "line",
     });
     expect(mocks.rpc).toHaveBeenCalledWith("schedule_work_order", expect.objectContaining({
       p_expected_lock_version: 1,

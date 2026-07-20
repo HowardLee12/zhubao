@@ -242,10 +242,13 @@ export interface WorkOrderDetail {
   photos: WorkOrderPhoto[];
 }
 
-export interface NotificationStatus {
+// The outbox envelope a mutation attaches. `queued` means the customer LINE
+// notification was enqueued transactionally (the outbox view is the source of
+// truth for actual delivery); `null` means the action enqueues no notification.
+export type NotificationStatus = {
   status: string;
-  reason: string;
-}
+  channel?: string;
+} | null;
 
 export interface WorkOrderListPage {
   data: WorkOrderListItem[];

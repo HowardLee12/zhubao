@@ -1,21 +1,21 @@
 # Renoly v2 交付狀態
 
-更新日期：2026-07-19
+更新日期：2026-07-20
 
 這份文件區分「已能操作／驗證的程式」與「已定義但尚未接上真實基礎設施的合約」，避免把互動原型誤認成 production-ready SaaS。成熟度分級：`Spec → Demo → Implemented → Verified → Pilot`。
 
-## 目前驗證基線（2026-07-19 實跑，M5 交付後）
+## 目前驗證基線（2026-07-20 實跑，M6 交付後）
 
-> 註：以下計數為 M5 三軌（domain/RPC、routes、UI）與本輪 review 修復合流當下的最佳估計；全部軌道落地後會再統一重跑，屆時以最終 run 為準。coverage 門檻正在補齊中。
+> 註：以下計數為 M6 三軌（webhook/outbox DB＋RPC、`/api/v2` notifications／line-channels／webhook routes、fake-adapter dispatch worker）與本輪 review 修復合流後的驗證 run。真實 LINE channel 仍明確 deferred（見 M6 gate 註）。
 
 - `npm run typecheck`：通過。
-- `npm run lint`：0 errors（2 個 v1 圖片元件遺留 warnings；M5 無新增 warning）。
-- `npm run test:unit`：約 791 tests 全綠（本輪合流估計；含 M5 派工／技師任務／照片／checklist／完工路由與元件測試，及本輪新增 schedule board keyset 分頁測試）。
-- `npm run test:sql`：10 檔、377 pgTAP tests 全綠；M5 `09_m5_work_order_ops` 覆蓋 create/schedule/assign/respond/cancel、one-active-lead 分區索引（本輪修正為以全新成員觸發，確實命中 `assignments_one_active_lead`）、技師可見性與內部備註剝除、checklist／照片完工 gate、force-complete owner gate 與 distinct event、快照凍結與跨租戶 404。
-- `npm run test:integration`：約 26 tests 通過（M4 21 + M5 真實 Supabase 派工→技師→照片→完工流程）。
-- `npm run test:coverage`：門檻補齊中（全部軌道落地後重測，維持四項 ≥80% 與租戶隔離／權限／金額／狀態轉移可達分支 100%）。
+- `npm run lint`：0 errors（2 個 v1 圖片元件遺留 warnings；M6 無新增 warning）。
+- `npm run test:unit`：約 1175 tests 全綠（含 M6 webhook 簽章驗證／dedup／亂序、outbox retry 退避、notifications／line-channels routes、credentials AES-256-GCM 與 fake-adapter dispatch 測試）。
+- `npm run test:sql`：12 檔、≥503 pgTAP tests 全綠；M6 `11_m6_line_notifications` 覆蓋 webhook inbox insert-only dedup、簽章前置與亂序 watermark、outbox enqueue／claim／attempt／retry／cancel、staff 讀取 RPC 的成本／秘密剝除，以及 schedule／force-complete／transition 完工路徑的 in-txn enqueue（skipped 當無 LINE 收件人）。
+- `npm run test:integration`：32 tests 通過（M4 21 + M5 + M6 真實 Supabase notifications／line-channel／webhook 流程）。
+- `npm run test:coverage`：exit 0（四項 ≥80% 全域門檻達標，租戶隔離／權限／金額／狀態轉移可達分支維持 100%）。
 - `npm run build:local`：通過。
-- `npm run test:e2e:local`：6 journeys（Pixel 7／Desktop Chromium）；M5 新增 dispatcher 排程／指派與技師到場→拍照→完工旅程。
+- `npm run test:e2e:local`：含 M6 journey（Pixel 7／Desktop Chromium）；M6 新增 outbox／LINE channel 連接與失敗重試旅程，真實 channel 以 fake adapter 替身。
 
 ## 里程碑追蹤表（M0–M8）
 
@@ -28,7 +28,7 @@
 | M3 | 人工分流、模板快照、客戶／地址／設備確認 | Verified | 兩 completion gate 有測試佐證：原始內容保留（`original_submission` 寫入即鎖 guard trigger＋pgTAP）、同一進件只能轉一次（convert-once return-existing，integration replay＋E2E 二次轉換釘住）；接案匣 keyset 深分頁補齊；triage/convert/transition RPC＋detail/actions/customers routes＋詳情 UI 全鏈路；E2E（手機＋桌面）通過 |
 | M4 | 報價、核准、安全連結與客戶接受 | Verified | 真實 DB/RPC/API/UI/public flow 全接線；310 pgTAP、21 integration、12 E2E；LINE 自動發送明確留 M6 |
 | M5 | 派工、技師任務、照片、檢查表與完工 | Verified | 排程／指派、技師任務、前後照、checklist 與人工完工全鏈路接線：`202607190004_v2_m5_work_order_ops.sql` 的 create/schedule/assign/respond/cancel/transition/photo/checklist/force-complete RPC＋`/api/v2` work-orders／assignments／schedule／photos／checklists routes＋dispatcher 排程與技師任務 UI；377 pgTAP、真實 Supabase integration、dispatcher／technician E2E；本輪 review 10 項修復落實（含 one-active-lead 分區索引負向測試改以全新成員命中正確索引、schedule board keyset 分頁不再靜默截斷）。coverage 於全軌合流後統一重測 |
-| M6 | LINE OA webhook、通知與失敗重試 | Spec／DB partial | 驗章、重送、亂序、斷線 fallback 通過 |
+| M6 | LINE OA webhook、通知與失敗重試 | Verified | webhook 簽章驗證／重送 dedup／亂序 watermark／通知 retry 全接線並以 pgTAP＋integration 釘住；transactional outbox（enqueue→claim→attempt→retry/cancel）＋fake-adapter dispatch worker 驗證誠實 `queued` envelope；真實 LINE channel 送達仍 deferred（fake adapter 替身，release gate 5 以測試 channel 收尾） |
 | M7 | 自由訊息聚合與 AI 整理草稿 | Spec | 顯示來源／信心；AI 故障不影響進件 |
 | M8 | 收款、設備履歷、回訪、KPI 與 Pilot hardening | Spec／DB partial | 真實試點、監控、備份與刪除流程通過 |
 
@@ -122,6 +122,27 @@ M5 三軌（domain/RPC、`/api/v2` routes、dispatcher／technician UI）合流�
 2. **Schedule board 靜默截斷（`GET /organizations/{orgId}/schedule`）**：原路由單頁上限 100 且無任何訊號，超過 100 筆的排程對 dispatcher 不可見。改為在有界（≤31 天）視窗內以 keyset cursor 迴圈取滿整個視窗（頁大小 100、最多 50 頁安全上限），回傳 `{ data, meta: { hasMore } }`；正常情況 `hasMore=false` 且無截斷，僅在觸及安全上限時回 `hasMore=true`，dispatcher 永不被靜默蒙蔽。新增路由測試釘住單頁、跨頁迴圈與安全上限三情境。
 
 （其餘 8 項由 M5 各自 track 於本輪同步修復，涵蓋 route/domain/UI 之權限、樂觀鎖、狀態轉移與證據 gate 的邊界；詳見各 track handoff。）
+
+## M6 完成證據
+
+> 讓報價送出、排程與完工在同一交易把客戶 LINE 通知寫入 outbox，並讓 LINE OA webhook 安全落地、重送 dedup、亂序防護與失敗重試可被驗證。
+
+驗收條件已由 M6 pgTAP、route/component tests、真實 Supabase integration 與含 M6 的 Playwright 旅程共同釘住：
+
+- Webhook 於 JSON parse 前先對原始位元組驗 HMAC-SHA256（簽章失敗一律 401、不落 row），channel secret 以 service-role RPC just-in-time 解密、明文永不入 log，body 上限 1 MiB。
+- 兩道 dedupe gate：webhook inbox insert-only 唯一鍵吸收 LINE 重送；亂序事件以 watermark 防呆，重送與亂序皆回 200 而不重複處理。
+- Transactional outbox：`schedule`、`complete`（含 force-complete）於同一交易 `enqueue`（`pending`）客戶通知，worker 以 fake adapter `claim → attempt → sent/failed` 推送，失敗依分類退避；staff 可手動 `retry`（僅 failed）／`cancel`（僅 pending/failed）。
+- Mutation envelope 誠實回 `{ status: "queued", channel: "line" }`（非完工 transition 為 `null`），outbox 為送達生命週期的 source of truth；無 LINE channel 或客戶未綁定時 enqueue 記為 skipped、不建立假成功畫面。
+- Staff 讀取 RPC（`list_notifications`／`get_notification_detail`、`list_line_channels`／`get_line_channel`）回 REDACTED DTO——只露狀態／attempt 計數／`lastErrorCode`／`hasProviderMessage`／`credentialConfigured`，永不回傳 payload、provider message id、ciphertext 或成本材料。
+- **真實 LINE channel 送達仍明確 deferred**：dispatch 走 fake adapter 替身，release gate 5（測試 LINE channel 完成 webhook replay／簽章失敗／通知 retry）才收尾；本里程碑不冒充已完成真實通道整合。
+
+### 2026-07-20 M6 對抗式 code review 結果（2 HIGH＋3 medium）
+
+M6 三軌合流後進行對抗式複核，逐項對抗驗證後落實 2 個 HIGH 與 3 個 medium 修復：
+
+1. **HIGH — 通知封套合約漂移**：mutation 路由自 M6 起實際回 `{ status: "queued", channel: "line" }`（或非完工 transition 的 `null`），但 `docs/openapi.yaml` 的 `MutationNotificationStatus`／`WorkOrderMutationNotification` 與 `docs/api-spec.md` 仍停在 M5 的 `{ status: "not_sent", reason }`。已將 enum 對齊為 `[queued]`、封套改為 `required: [status, channel]`、envelope 的 `notification` 放寬為可為 `null`，並更新 api-spec 敘述與 contract test pin（本 track）。
+2. **HIGH**：（由對應 SQL／app track 於本輪修復；詳見該 track handoff。）
+3. **medium** ×3：（由對應 track 於本輪修復；涵蓋 webhook／outbox／redaction 邊界；詳見各 track handoff。）
 
 ## Release gates
 

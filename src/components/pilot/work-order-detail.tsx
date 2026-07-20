@@ -108,7 +108,7 @@ export function DispatcherWorkOrderDetail({ workOrderId }: Readonly<{ workOrderI
         input,
       );
       setSheet("none");
-      setNotice(`已排程並派工。${notificationLabel(result.notification.status)}`);
+      setNotice(`已排程並派工。${notificationLabel(result.notification)}`);
       await refresh();
     } catch (cause) {
       if (cause instanceof ScheduleConflictError) {
@@ -133,7 +133,7 @@ export function DispatcherWorkOrderDetail({ workOrderId }: Readonly<{ workOrderI
         state.detail.lockVersion,
         "dispatch",
       );
-      setNotice(`已派工。${notificationLabel(result.notification.status)}`);
+      setNotice(`已派工。${notificationLabel(result.notification)}`);
       await refresh();
     } catch (cause) {
       if (cause instanceof PilotApiError && cause.status === 412) {
@@ -154,7 +154,7 @@ export function DispatcherWorkOrderDetail({ workOrderId }: Readonly<{ workOrderI
       input,
     );
     setSheet("none");
-    setNotice(`已例外完工（非客戶簽認）。${notificationLabel(result.notification.status)}`);
+    setNotice(`已例外完工（非客戶簽認）。${notificationLabel(result.notification)}`);
     await refresh();
   };
 
@@ -366,6 +366,6 @@ export function DispatcherWorkOrderDetail({ workOrderId }: Readonly<{ workOrderI
   );
 }
 
-function notificationLabel(status: string): string {
-  return status === "not_sent" ? "通知尚未自動發送（下一階段開放）。" : "";
+function notificationLabel(notification: { status: string } | null): string {
+  return notification?.status === "queued" ? "已排入 LINE 通知，稍後自動發送。" : "";
 }

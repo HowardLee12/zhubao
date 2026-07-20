@@ -96,7 +96,7 @@ describe("force-complete action route", () => {
     const body = await response.json();
     expect(body.data.status).toBe("completed");
     expect(body.data.customerSignedAt).toBeNull();
-    expect(body.notification.status).toBe("not_sent");
+    expect(body.notification.status).toBe("queued");
     expect(mocks.rpc).toHaveBeenCalledWith("force_complete_work_order", expect.objectContaining({
       p_reason: "客戶要求提前結案",
       p_expected_lock_version: 5,

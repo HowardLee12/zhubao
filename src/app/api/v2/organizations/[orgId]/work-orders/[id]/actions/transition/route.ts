@@ -10,7 +10,7 @@ import { mapWorkOrderRpcError } from "@/server/api/work-order-errors";
 import type { WorkOrderActorRole } from "@/server/domain/work-orders/work-order-state";
 import {
   factsFromDetailDto,
-  NOT_SENT_NOTIFICATION,
+  QUEUED_NOTIFICATION,
 } from "@/server/work-orders/commands";
 import { preCheckWorkOrderTransition, targetStatusFor } from "@/server/work-orders/gateway";
 import {
@@ -121,8 +121,11 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     if (!data || typeof data !== "object") throw internalApiProblem();
 
     const dto = data as { lockVersion?: number };
+    // Only a normal (customer-signoff) completion enqueues a customer LINE
+    // notification (see transition_work_order); other transitions carry none.
+    const notification = body.action === "complete" ? QUEUED_NOTIFICATION : null;
     return apiJsonResponse(
-      { data, notification: NOT_SENT_NOTIFICATION },
+      { data, notification },
       {
         requestId,
         headers:

@@ -128,7 +128,7 @@ describe("work-order-api client helpers", () => {
   it("schedules a work order with If-Match and returns the notification envelope", async () => {
     const envelope = {
       data: { id: workOrderId, status: "scheduled", lockVersion: 2 },
-      notification: { status: "not_sent", reason: "line_delivery_deferred_to_m6" },
+      notification: { status: "queued", channel: "line" },
     };
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(envelope));
     vi.stubGlobal("fetch", fetchMock);
@@ -140,7 +140,7 @@ describe("work-order-api client helpers", () => {
       assignments: [{ membershipId: "30000000-0000-4000-8000-000000000003", duty: "lead" }],
     });
 
-    expect(result.notification.status).toBe("not_sent");
+    expect(result.notification?.status).toBe("queued");
     const [url, init] = lastCall(fetchMock);
     expect(url).toContain("/actions/schedule");
     expect(headerValue(init, "If-Match")).toBe('"1"');
@@ -196,7 +196,7 @@ describe("work-order-api client helpers", () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({
         data: { status: "completed", lockVersion: 5 },
-        notification: { status: "not_sent", reason: "line_delivery_deferred_to_m6" },
+        notification: { status: "queued", channel: "line" },
       }),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -218,7 +218,7 @@ describe("work-order-api client helpers", () => {
 
   it("carries the reason on cancel/reopen transitions", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse({ data: { status: "cancelled" }, notification: { status: "not_sent", reason: "x" } }),
+      jsonResponse({ data: { status: "cancelled" }, notification: { status: "queued", channel: "line" } }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -231,7 +231,7 @@ describe("work-order-api client helpers", () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({
         data: { id: workOrderId, status: "completed", customerSignedAt: null, lockVersion: 6 },
-        notification: { status: "not_sent", reason: "line_delivery_deferred_to_m6" },
+        notification: { status: "queued", channel: "line" },
       }),
     );
     vi.stubGlobal("fetch", fetchMock);

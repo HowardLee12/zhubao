@@ -101,7 +101,8 @@ describe("transition action route", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data.status).toBe("on_site");
-    expect(body.notification.status).toBe("not_sent");
+    // A non-completing transition (arrive) enqueues no customer notification.
+    expect(body.notification).toBeNull();
     expect(mocks.rpc).toHaveBeenNthCalledWith(2, "transition_work_order_safe", expect.objectContaining({
       target_status: "on_site",
       expected_lock_version: 3,

@@ -503,6 +503,55 @@ values (
   '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002'
 );
 
+-- M6 fixtures: one active LINE channel per org, an encrypted credential row for
+-- Alpha's channel (synthetic ciphertext; the real AES-256-GCM envelope is written
+-- by the connect route — these bytes only satisfy the size/nonce constraints so
+-- credential-presence paths are exercisable), and a bound customer LINE identity
+-- so customer-recipient notifications have a deterministic target. The one-active-
+-- per-org unique means pgTAP suites must reuse these ids rather than insert a new
+-- active channel for the same org.
+insert into public.line_channels (
+  id, organization_id, name, channel_id, basic_id, status,
+  webhook_verified_at, credential_version,
+  created_at, updated_at, created_by, updated_by
+)
+values
+  (
+    'a1c00000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001',
+    'Alpha 官方帳號', 'alpha-oa-channel-id', '@alpha-oa', 'active',
+    '2026-01-03 00:00:00+00', 1,
+    '2026-01-03 00:00:00+00', '2026-01-03 00:00:00+00',
+    '10000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001'
+  ),
+  (
+    'b1c00000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002',
+    'Beta 官方帳號', 'beta-oa-channel-id', '@beta-oa', 'active',
+    '2026-01-03 00:00:00+00', 1,
+    '2026-01-03 00:00:00+00', '2026-01-03 00:00:00+00',
+    '10000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000005'
+  );
+
+insert into private.line_channel_credentials (
+  line_channel_id, organization_id, secret_ciphertext, secret_nonce,
+  access_token_ciphertext, access_token_nonce, key_version, rotated_at
+)
+values (
+  'a1c00000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001',
+  decode('00000000000000000000000000000000', 'hex'), decode('000000000000000000000000', 'hex'),
+  decode('11111111111111111111111111111111', 'hex'), decode('111111111111111111111111', 'hex'),
+  1, '2026-01-03 00:00:00+00'
+);
+
+insert into public.customer_line_identities (
+  id, organization_id, customer_id, line_channel_id, line_user_id, display_name,
+  friend_status, followed_at
+)
+values (
+  'a1de0000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001',
+  '40000000-0000-4000-8000-000000000001', 'a1c00000-0000-4000-8000-000000000001',
+  'Uline-alpha-customer-0001', '示範客戶 A', 'friend', '2026-01-03 00:00:00+00'
+);
+
 insert into public.notifications (
   id, organization_id, channel, membership_id, template_key, template_version,
   payload, status, approval_status, dedupe_key, scheduled_at, attempt_count,
@@ -517,6 +566,20 @@ values (
   'FIXTURE_TIMEOUT', 'Synthetic timeout', '2026-01-05 00:01:00+00',
   'work_order', '82000000-0000-4000-8000-000000000001',
   '2026-01-05 00:00:00+00', '2026-01-05 00:01:00+00'
+);
+
+-- A durable webhook inbox fixture (already processed) so read-path/worker tests
+-- have a deterministic row without re-ingesting.
+insert into public.line_webhook_events (
+  id, organization_id, line_channel_id, webhook_event_id, event_type,
+  event_timestamp, payload, payload_sha256, status, processed_at, received_at
+)
+values (
+  'a1eb0000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001',
+  'a1c00000-0000-4000-8000-000000000001', 'seed-wh-evt-0001', 'follow',
+  '2026-01-04 00:00:00+00', '{"events":[{"type":"follow"}]}',
+  'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+  'processed', '2026-01-04 00:00:05+00', '2026-01-04 00:00:00+00'
 );
 
 insert into public.public_access_tokens (

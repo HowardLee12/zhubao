@@ -5,13 +5,17 @@ import type {
   WorkOrderTransitionFacts,
 } from "@/server/domain/work-orders/work-order-state";
 
-// Honest LINE status. Scheduling, dispatch and completion do NOT send a LINE
-// message in M5; delivery is deferred to M6. Every route that would trigger a
-// customer/technician notification surfaces this in its envelope so the UI never
-// implies a message was sent.
-export const NOT_SENT_NOTIFICATION = {
-  status: "not_sent",
-  reason: "line_delivery_deferred_to_m6",
+// Honest LINE status. As of M6, scheduling and completion enqueue the customer
+// LINE notification transactionally into the outbox (status `pending`), then a
+// worker dispatches it. The mutation route reports `queued` — NOT `sent` — so the
+// UI never implies the message already reached the customer; the outbox view is
+// the source of truth for the actual delivery lifecycle. When the org has not
+// connected a LINE channel or the customer has no bound LINE identity, the DB
+// records the enqueue as skipped and nothing is queued; the coarse `queued`
+// envelope stays honest because the outbox (empty for that resource) confirms it.
+export const QUEUED_NOTIFICATION = {
+  status: "queued",
+  channel: "line",
 } as const;
 
 export interface WorkOrderDetail {

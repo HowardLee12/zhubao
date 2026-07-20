@@ -213,6 +213,36 @@ export function PilotSettings() {
         </span>
       </Link>
 
+      <Link
+        href="/app/settings/line-channel"
+        className="mb-3 flex items-center justify-between gap-4 rounded-[22px] border border-warm-border bg-white p-5 shadow-[0_14px_36px_rgba(74,45,20,0.07)] transition hover:border-orange/40"
+      >
+        <span className="min-w-0">
+          <span className="block text-lg font-black text-ink">LINE 官方帳號</span>
+          <span className="mt-1 block text-sm leading-6 text-ink-3">
+            連接 LINE，讓系統自動通知客戶。
+          </span>
+        </span>
+        <span aria-hidden="true" className="shrink-0 text-xl font-black text-orange">
+          →
+        </span>
+      </Link>
+
+      <Link
+        href="/app/notifications"
+        className="mb-5 flex items-center justify-between gap-4 rounded-[22px] border border-warm-border bg-white p-5 shadow-[0_14px_36px_rgba(74,45,20,0.07)] transition hover:border-orange/40"
+      >
+        <span className="min-w-0">
+          <span className="block text-lg font-black text-ink">通知發送紀錄</span>
+          <span className="mt-1 block text-sm leading-6 text-ink-3">
+            查看 LINE 通知狀態，重送失敗的通知。
+          </span>
+        </span>
+        <span aria-hidden="true" className="shrink-0 text-xl font-black text-orange">
+          →
+        </span>
+      </Link>
+
       <PilotCard>
         <form aria-label="店家設定" className="space-y-5" onSubmit={save}>
           <Field>

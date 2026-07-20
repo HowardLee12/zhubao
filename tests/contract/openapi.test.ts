@@ -292,7 +292,8 @@ describe("OpenAPI contract", () => {
       "#/components/schemas/WorkOrderDetailEnvelope",
     );
 
-    // Schedule and transition carry the honest not-sent notification envelope.
+    // Schedule and transition carry the honest coarse enqueue envelope (M6:
+    // queued to the LINE outbox, never "sent").
     expect(
       responseRef("/organizations/{orgId}/work-orders/{id}/actions/schedule", "post", "200"),
     ).toBe("#/components/schemas/WorkOrderMutationEnvelope");
@@ -306,8 +307,8 @@ describe("OpenAPI contract", () => {
     const mutationEnvelope = schemas.WorkOrderMutationEnvelope as JsonRecord;
     expect(mutationEnvelope.required).toEqual(["data", "notification"]);
     const mutationNotification = schemas.WorkOrderMutationNotification as JsonRecord;
-    expect(mutationNotification.required).toEqual(["status", "reason"]);
-    expect((schemas.MutationNotificationStatus as JsonRecord).enum).toEqual(["not_sent"]);
+    expect(mutationNotification.required).toEqual(["status", "channel"]);
+    expect((schemas.MutationNotificationStatus as JsonRecord).enum).toEqual(["queued"]);
 
     // The detail projection drops the never-emitted actualStartAt and carries the
     // nested roster, checklists and photos.

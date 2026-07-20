@@ -7,7 +7,7 @@ import { parseIfMatch } from "@/server/api/headers";
 import { ApiProblem } from "@/server/api/problem";
 import { parseJsonBody, resolveRequestId } from "@/server/api/request";
 import { mapWorkOrderRpcError } from "@/server/api/work-order-errors";
-import { NOT_SENT_NOTIFICATION } from "@/server/work-orders/commands";
+import { QUEUED_NOTIFICATION } from "@/server/work-orders/commands";
 import {
   apiJsonResponse,
   apiProblemResponse,
@@ -66,7 +66,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     return apiJsonResponse(
       {
         data: toClientWorkOrderDetail(detail.data),
-        notification: NOT_SENT_NOTIFICATION,
+        notification: QUEUED_NOTIFICATION,
       },
       { requestId, headers: { etag: `"${detail.data.lockVersion}"` } },
     );

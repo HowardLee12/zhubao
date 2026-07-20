@@ -396,7 +396,7 @@ Transition：
 
 Action allowlist：`dispatch/enRoute/arrive/pause/resume/complete/cancel/reopen`。server 依 action、目前 status 與角色決定 next state，client 不傳目標 `status`。`occurredAt` 不得晚於現在 5 分鐘；早於 24 小時時僅 O/A 可帶 `overrideReason` 補登，且最久只能回溯 30 天。超出硬邊界回 `OCCURRED_AT_OUT_OF_RANGE`，不可覆寫。
 
-`schedule` 與 `transition`（以及 force-complete）成功回應為 `{ "data": <workOrder detail>, "notification": { "status": "not_sent", "reason": "line_delivery_deferred_to_m6" } }`。M5 尚未送出 LINE 通知，envelope 誠實標示 `not_sent`，UI 不得暗示已發送。
+`schedule` 與 `transition`（以及 force-complete）成功回應為 `{ "data": <workOrder detail>, "notification": { "status": "queued", "channel": "line" } }`。M6 起 `schedule`、`complete` 與 force-complete 於同一交易把客戶 LINE 通知寫入 outbox（`pending`），envelope 誠實標示 `queued`（不是 `sent`）；outbox（`GET /organizations/{orgId}/notifications`）才是實際送達生命週期的 source of truth。當組織尚未連接 LINE channel 或客戶未綁定 LINE 身分，enqueue 會被記為 skipped、outbox 為空，coarse 的 `queued` 仍屬誠實。`transition` 對非完工動作（如 dispatch、enRoute）不 enqueue 任何客戶通知，`notification` 為 `null`。UI 不得暗示已送達。
 
 排程衝突預設回 409（每筆含 `workOrderNo`）：
 

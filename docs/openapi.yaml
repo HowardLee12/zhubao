@@ -6778,32 +6778,44 @@ components:
     MutationNotificationStatus:
       type: string
       description: >-
-        Honest customer/technician notification status for M5 mutation responses.
-        LINE delivery is deferred to M6, so scheduling, dispatch and completion
-        never send a message and always report not_sent.
-      enum: [not_sent]
+        Honest customer notification status on a mutation response. As of M6 the
+        scheduling and completion mutations enqueue the customer LINE notification
+        transactionally into the outbox, so the envelope reports `queued` — never
+        `sent`. The outbox (GET /organizations/{orgId}/notifications) is the source
+        of truth for the actual delivery lifecycle; when the org has no connected
+        LINE channel or the customer has no bound identity the enqueue is recorded
+        as skipped and the (empty) outbox for that resource keeps `queued` honest.
+      enum: [queued]
     WorkOrderMutationNotification:
       type: object
       additionalProperties: false
+      description: >-
+        Coarse enqueue signal returned alongside a work-order mutation. `channel`
+        names the delivery channel the notification was queued on.
       properties:
         status:
           $ref: "#/components/schemas/MutationNotificationStatus"
-        reason:
+        channel:
           type: string
-          description: Machine-readable reason the notification was not sent.
-          maxLength: 200
-      required: [status, reason]
+          description: Delivery channel the customer notification was queued on.
+          enum: [line]
+      required: [status, channel]
     WorkOrderMutationEnvelope:
       type: object
       additionalProperties: false
       description: >-
-        Work-order mutation response. Carries the updated detail plus the honest
-        notification status, so the UI never implies a customer message was sent.
+        Work-order mutation response. Carries the updated detail plus the coarse
+        enqueue signal, so the UI reports the customer message was queued (not
+        sent). `notification` is null when the transition enqueues nothing — e.g. a
+        non-completing transition such as dispatch or en-route carries no customer
+        notification.
       properties:
         data:
           $ref: "#/components/schemas/WorkOrderDetail"
         notification:
-          $ref: "#/components/schemas/WorkOrderMutationNotification"
+          oneOf:
+            - $ref: "#/components/schemas/WorkOrderMutationNotification"
+            - type: "null"
       required: [data, notification]
     WorkOrderListEnvelope:
       type: object

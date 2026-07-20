@@ -180,3 +180,129 @@ describe("processClaimedWebhookEvents", () => {
     expect(summary).toEqual({ claimed: 0, processed: 0, ignored: 0, failed: 0 });
   });
 });
+
+describe("processClaimedWebhookEvents — M7 message branch", () => {
+  const messageEvent = (over: Record<string, unknown> = {}): ClaimedWebhookEvent => ({
+    id: "evt-msg-1",
+    organizationId: "20000000-0000-4000-8000-000000000001",
+    lineChannelId: "a1c00000-0000-4000-8000-000000000001",
+    webhookEventId: "evt-msg-1",
+    eventType: "message",
+    eventTimestamp: "2026-07-20T10:00:00.000Z",
+    payload: {
+      type: "message",
+      source: { type: "user", userId: "Uabc" },
+      message: { id: "line-msg-1", type: "text", text: "冷氣不冷" },
+    },
+    attemptCount: 0,
+    ...over,
+  });
+
+  function noopFacts() {
+    return {
+      resolveFacts: async () => ({ currentFriendStatus: "unknown" as const, lastAppliedTimestamp: null }),
+      applyFollowChange: async () => {},
+      advanceWatermark: async () => {},
+    };
+  }
+
+  it("routes a text message to the ingestMessage seam and marks it processed", async () => {
+    let marked: string | null = null;
+    const client = rpcClient({
+      claim_line_webhook_events: () => ({ data: [messageEvent()], error: null }),
+      mark_webhook_processed: () => {
+        marked = "processed";
+        return { data: { id: "evt-msg-1", status: "processed" }, error: null };
+      },
+    });
+    const ingested: Array<{ lineMessageId: string; isImage: boolean }> = [];
+
+    const summary = await processClaimedWebhookEvents({
+      supabase: client,
+      workerId: "w",
+      ...noopFacts(),
+      ingestMessage: async (_event, command) => {
+        ingested.push({ lineMessageId: command.lineMessageId, isImage: command.isImage });
+      },
+    });
+
+    expect(summary).toMatchObject({ processed: 1, ignored: 0, failed: 0 });
+    expect(marked).toBe("processed");
+    expect(ingested).toEqual([{ lineMessageId: "line-msg-1", isImage: false }]);
+  });
+
+  it("flags an image message for media download", async () => {
+    const client = rpcClient({
+      claim_line_webhook_events: () => ({
+        data: [messageEvent({ payload: { type: "message", source: { type: "user", userId: "Uabc" }, message: { id: "img-1", type: "image" } } })],
+        error: null,
+      }),
+      mark_webhook_processed: () => ({ data: { id: "evt-msg-1", status: "processed" }, error: null }),
+    });
+    let sawImage = false;
+    await processClaimedWebhookEvents({
+      supabase: client,
+      workerId: "w",
+      ...noopFacts(),
+      ingestMessage: async (_event, command) => {
+        sawImage = command.isImage;
+      },
+    });
+    expect(sawImage).toBe(true);
+  });
+
+  it("marks a group message ignored (missing sender) without calling the seam", async () => {
+    let ingestCalls = 0;
+    const client = rpcClient({
+      claim_line_webhook_events: () => ({
+        data: [messageEvent({ payload: { type: "message", source: { type: "group", groupId: "G1" }, message: { id: "m", type: "text", text: "hi" } } })],
+        error: null,
+      }),
+      mark_webhook_ignored: () => ({ data: { id: "evt-msg-1", status: "ignored" }, error: null }),
+    });
+    const summary = await processClaimedWebhookEvents({
+      supabase: client,
+      workerId: "w",
+      ...noopFacts(),
+      ingestMessage: async () => {
+        ingestCalls += 1;
+      },
+    });
+    expect(summary.ignored).toBe(1);
+    expect(ingestCalls).toBe(0);
+  });
+
+  it("a message event with no ingestMessage seam falls through to the M6 ignore path", async () => {
+    const client = rpcClient({
+      claim_line_webhook_events: () => ({ data: [messageEvent()], error: null }),
+      mark_webhook_ignored: () => ({ data: { id: "evt-msg-1", status: "ignored" }, error: null }),
+    });
+    const summary = await processClaimedWebhookEvents({
+      supabase: client,
+      workerId: "w",
+      ...noopFacts(),
+    });
+    expect(summary.ignored).toBe(1);
+  });
+
+  it("an ingestMessage that throws marks the event failed (re-claimable)", async () => {
+    let marked: string | null = null;
+    const client = rpcClient({
+      claim_line_webhook_events: () => ({ data: [messageEvent()], error: null }),
+      mark_webhook_failed: () => {
+        marked = "failed";
+        return { data: { id: "evt-msg-1", status: "failed" }, error: null };
+      },
+    });
+    const summary = await processClaimedWebhookEvents({
+      supabase: client,
+      workerId: "w",
+      ...noopFacts(),
+      ingestMessage: async () => {
+        throw new Error("ingest blew up");
+      },
+    });
+    expect(summary.failed).toBe(1);
+    expect(marked).toBe("failed");
+  });
+});

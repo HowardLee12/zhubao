@@ -20,7 +20,7 @@ select is(
    from pg_class c join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind in ('r', 'p')
      and c.relrowsecurity and c.relforcerowsecurity),
-  33,
+  38,
   'all public tenant tables were found with FORCE RLS'
 );
 

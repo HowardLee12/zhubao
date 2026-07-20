@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { lineWebhookBodySchema } from "@/schemas/line-webhook";
 import { internalApiProblem } from "@/server/supabase/http";
 import {
+  decideMessageIngest,
   decideWebhookApply,
   type FriendStatus,
 } from "./webhook-handler";
@@ -97,6 +98,21 @@ export interface ProcessInput {
   // timestamp sits between the applied change and the ignored one would wrongly
   // win. Injected seam; a no-op is acceptable when the identity is unknown.
   advanceWatermark: (event: ClaimedWebhookEvent) => Promise<void>;
+  // M7 message-aggregation seam. Called for a claimed 'message' webhook event whose
+  // payload decodes to an ingest command: it lands the message into the sender's open
+  // conversation (ingest_inbound_message) and, for images, downloads media. Injected
+  // so the worker route wires the admin client + content fetcher while tests inject a
+  // stub. When omitted, message events fall through to the M6 ignore path.
+  ingestMessage?: (event: ClaimedWebhookEvent, command: MessageIngestCommand) => Promise<void>;
+}
+
+// The decoded, ready-to-ingest shape handed to the ingestMessage seam.
+export interface MessageIngestCommand {
+  lineUserId: string;
+  lineMessageId: string;
+  messageType: "text" | "image" | "sticker" | "other";
+  textContent: string | null;
+  isImage: boolean;
 }
 
 export interface ProcessSummary {
@@ -144,6 +160,30 @@ export async function processClaimedWebhookEvents(input: ProcessInput): Promise<
 
   for (const event of rows) {
     try {
+      // M7 message branch: a 'message' event is aggregated into a conversation
+      // (not a follow/unfollow state change). Decode it and, when it is an ingestable
+      // user message and the seam is wired, land it; then mark the event processed.
+      // A group/room/malformed message (or an unwired seam) falls through to the M6
+      // decision below, which marks it ignored(unhandled_event_type).
+      if (event.eventType === "message" && input.ingestMessage) {
+        const messageDecision = decideMessageIngest(event.payload);
+        if (messageDecision.action === "ingest") {
+          await input.ingestMessage(event, {
+            lineUserId: messageDecision.lineUserId,
+            lineMessageId: messageDecision.lineMessageId,
+            messageType: messageDecision.messageType,
+            textContent: messageDecision.textContent,
+            isImage: messageDecision.isImage,
+          });
+          await mark(input, "mark_webhook_processed", event.id, null);
+          summary.processed += 1;
+          continue;
+        }
+        await mark(input, "mark_webhook_ignored", event.id, messageDecision.reason);
+        summary.ignored += 1;
+        continue;
+      }
+
       const facts = await input.resolveFacts(event);
       const decision = decideWebhookApply({
         eventType: event.eventType,

@@ -1,3 +1,10 @@
+import type {
+  ConfirmIntakeDraftEnvelope,
+  ConfirmIntakeDraftRequest,
+  DismissIntakeDraftEnvelope,
+  IntakeDraftDetail,
+  IntakeDraftListItem,
+} from "@/schemas/intake-draft";
 import type { PilotInboxItem } from "@/schemas/pilot-inbox";
 
 export type { PilotInboxItem };
@@ -395,6 +402,101 @@ export async function submitPublicIntake(
     },
   );
   const envelope = await readJson<{ data: PublicIntakeReceipt }>(response);
+  return envelope.data;
+}
+
+// ---------------------------------------------------------------------------
+// M7 intake-draft (待確認 · LINE) client helpers.
+//
+// A draft is never an action: confirm turns the AI/manual draft into a
+// service_request (source=line) that a human then triages (M3); dismiss drops it.
+// Confirm carries the optimistic lock in If-Match, an Idempotency-Key for safe
+// retries, and the double-submit CSRF token. Shapes mirror the Wave 2 route DTOs.
+// ---------------------------------------------------------------------------
+
+function draftOrgPath(organizationId: string): string {
+  return `/api/v2/organizations/${encodeURIComponent(organizationId)}/intake-drafts`;
+}
+
+export type IntakeDraftListStatus =
+  | "pending_review"
+  | "confirmed"
+  | "dismissed"
+  | "superseded";
+
+export async function fetchIntakeDrafts(
+  organizationId: string,
+  options: { status?: IntakeDraftListStatus; limit?: number } = {},
+): Promise<IntakeDraftListItem[]> {
+  const params = new URLSearchParams();
+  params.set("status", options.status ?? "pending_review");
+  params.set("limit", String(options.limit ?? 50));
+
+  const response = await fetch(`${draftOrgPath(organizationId)}?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  const envelope = await readJson<{ data: IntakeDraftListItem[] }>(response);
+  return envelope.data;
+}
+
+export async function fetchIntakeDraftDetail(
+  organizationId: string,
+  draftId: string,
+): Promise<IntakeDraftDetail> {
+  const response = await fetch(
+    `${draftOrgPath(organizationId)}/${encodeURIComponent(draftId)}`,
+    { method: "GET", headers: { Accept: "application/json" } },
+  );
+  const envelope = await readJson<{ data: IntakeDraftDetail }>(response);
+  return envelope.data;
+}
+
+export async function confirmIntakeDraft(
+  organizationId: string,
+  draftId: string,
+  lockVersion: number,
+  idempotencyKey: string,
+  body: ConfirmIntakeDraftRequest = {},
+): Promise<ConfirmIntakeDraftEnvelope> {
+  const response = await fetch(
+    `${draftOrgPath(organizationId)}/${encodeURIComponent(draftId)}/actions/confirm`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "If-Match": `"${lockVersion}"`,
+        "Idempotency-Key": idempotencyKey,
+        "X-CSRF-Token": ensureCsrfToken(),
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  const envelope = await readJson<{ data: ConfirmIntakeDraftEnvelope }>(response);
+  return envelope.data;
+}
+
+export async function dismissIntakeDraft(
+  organizationId: string,
+  draftId: string,
+  lockVersion: number,
+  reason?: string,
+): Promise<DismissIntakeDraftEnvelope> {
+  const response = await fetch(
+    `${draftOrgPath(organizationId)}/${encodeURIComponent(draftId)}/actions/dismiss`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "If-Match": `"${lockVersion}"`,
+        "X-CSRF-Token": ensureCsrfToken(),
+      },
+      body: JSON.stringify(reason ? { reason } : {}),
+    },
+  );
+  const envelope = await readJson<{ data: DismissIntakeDraftEnvelope }>(response);
   return envelope.data;
 }
 

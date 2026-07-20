@@ -1,10 +1,83 @@
 import { describe, expect, it } from "vitest";
 
-import { decideWebhookApply, type FriendStatus, type WebhookApplyFacts } from "./webhook-handler";
+import {
+  decideMessageIngest,
+  decideWebhookApply,
+  type FriendStatus,
+  type WebhookApplyFacts,
+} from "./webhook-handler";
 import {
   processClaimedWebhookEvents,
   type ClaimedWebhookEvent,
 } from "./webhook-gateway";
+
+describe("decideMessageIngest (M7 message branch)", () => {
+  const payload = (over: Record<string, unknown> = {}) => ({
+    type: "message",
+    timestamp: 1_700_000_000_000,
+    source: { type: "user", userId: "Uabc123" },
+    message: { id: "line-msg-1", type: "text", text: "冷氣不冷" },
+    ...over,
+  });
+
+  it("ingests a text message with the sender line_user_id and text content", () => {
+    const decision = decideMessageIngest(payload());
+    expect(decision.action).toBe("ingest");
+    if (decision.action === "ingest") {
+      expect(decision.lineUserId).toBe("Uabc123");
+      expect(decision.lineMessageId).toBe("line-msg-1");
+      expect(decision.messageType).toBe("text");
+      expect(decision.textContent).toBe("冷氣不冷");
+      expect(decision.isImage).toBe(false);
+    }
+  });
+
+  it("marks an image message for media download (isImage, no text)", () => {
+    const decision = decideMessageIngest(
+      payload({ message: { id: "line-msg-2", type: "image" } }),
+    );
+    expect(decision.action).toBe("ingest");
+    if (decision.action === "ingest") {
+      expect(decision.messageType).toBe("image");
+      expect(decision.isImage).toBe(true);
+      expect(decision.textContent).toBeNull();
+    }
+  });
+
+  it("maps a sticker to the sticker type with no text", () => {
+    const decision = decideMessageIngest(
+      payload({ message: { id: "line-msg-3", type: "sticker", packageId: "1" } }),
+    );
+    expect(decision.action).toBe("ingest");
+    if (decision.action === "ingest") expect(decision.messageType).toBe("sticker");
+  });
+
+  it("maps an unknown message subtype to 'other'", () => {
+    const decision = decideMessageIngest(
+      payload({ message: { id: "line-msg-4", type: "location" } }),
+    );
+    expect(decision.action).toBe("ingest");
+    if (decision.action === "ingest") expect(decision.messageType).toBe("other");
+  });
+
+  it("ignores a non-message event type", () => {
+    const decision = decideMessageIngest(payload({ type: "follow", message: undefined }));
+    expect(decision.action).toBe("ignore");
+    if (decision.action === "ignore") expect(decision.reason).toBe("not_a_message");
+  });
+
+  it("ignores a message from a non-user source (group/room) — no sender identity to aggregate", () => {
+    const decision = decideMessageIngest(payload({ source: { type: "group", groupId: "G1" } }));
+    expect(decision.action).toBe("ignore");
+    if (decision.action === "ignore") expect(decision.reason).toBe("missing_sender");
+  });
+
+  it("ignores a malformed message with no id", () => {
+    const decision = decideMessageIngest(payload({ message: { type: "text", text: "hi" } }));
+    expect(decision.action).toBe("ignore");
+    if (decision.action === "ignore") expect(decision.reason).toBe("missing_message_id");
+  });
+});
 
 const base: WebhookApplyFacts = {
   eventType: "follow",

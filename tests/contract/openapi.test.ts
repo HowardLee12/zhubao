@@ -68,9 +68,9 @@ describe("OpenAPI contract", () => {
       });
     });
 
-    expect(Object.keys(paths)).toHaveLength(123);
-    expect(operations).toHaveLength(164);
-    expect(Object.keys(schemas)).toHaveLength(307);
+    expect(Object.keys(paths)).toHaveLength(128);
+    expect(operations).toHaveLength(169);
+    expect(Object.keys(schemas)).toHaveLength(328);
   });
 
   it("keeps every internal reference resolvable", () => {
@@ -99,7 +99,7 @@ describe("OpenAPI contract", () => {
       });
     });
 
-    expect(operationIds).toHaveLength(164);
+    expect(operationIds).toHaveLength(169);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -377,5 +377,97 @@ describe("OpenAPI contract", () => {
     expect(
       responseRef("/organizations/{orgId}/assignments/{assignmentId}", "delete", "200"),
     ).toBe("#/components/schemas/AssignmentEnvelope");
+  });
+
+  it("pins the implemented M7 intake-draft inbox, review and worker contracts", () => {
+    expect(isRecord(parsedDocument)).toBe(true);
+    if (!isRecord(parsedDocument)) return;
+    const paths = parsedDocument.paths as JsonRecord;
+    const components = parsedDocument.components as JsonRecord;
+    const schemas = components.schemas as JsonRecord;
+
+    function responseRef(path: string, method: string, status: string): unknown {
+      const operation = (paths[path] as JsonRecord)[method] as JsonRecord;
+      const response = (operation.responses as JsonRecord)[status] as JsonRecord;
+      const media = (response.content as JsonRecord)["application/json"] as JsonRecord;
+      return (media.schema as JsonRecord).$ref;
+    }
+
+    function requestRef(path: string, method: string): unknown {
+      const operation = (paths[path] as JsonRecord)[method] as JsonRecord;
+      const content = (operation.requestBody as JsonRecord).content as JsonRecord;
+      const media = content["application/json"] as JsonRecord;
+      return (media.schema as JsonRecord).$ref;
+    }
+
+    function security(path: string, method: string): unknown {
+      return ((paths[path] as JsonRecord)[method] as JsonRecord).security;
+    }
+
+    // Inbox list and review detail return the read-only intake-draft projections.
+    expect(responseRef("/organizations/{orgId}/intake-drafts", "get", "200")).toBe(
+      "#/components/schemas/IntakeDraftListEnvelope",
+    );
+    expect(responseRef("/organizations/{orgId}/intake-drafts/{id}", "get", "200")).toBe(
+      "#/components/schemas/IntakeDraftDetailEnvelope",
+    );
+
+    // Confirm is the human-in-the-loop gate: 201 on create, 200 on idempotent replay,
+    // both carrying the confirm envelope; the optional body carries only field overrides.
+    expect(requestRef("/organizations/{orgId}/intake-drafts/{id}/actions/confirm", "post")).toBe(
+      "#/components/schemas/ConfirmIntakeDraftRequest",
+    );
+    expect(
+      responseRef("/organizations/{orgId}/intake-drafts/{id}/actions/confirm", "post", "201"),
+    ).toBe("#/components/schemas/ConfirmIntakeDraftEnvelope");
+    expect(
+      responseRef("/organizations/{orgId}/intake-drafts/{id}/actions/confirm", "post", "200"),
+    ).toBe("#/components/schemas/ConfirmIntakeDraftEnvelope");
+    const confirmParams = (
+      paths["/organizations/{orgId}/intake-drafts/{id}/actions/confirm"] as JsonRecord
+    ).parameters as unknown[];
+    const confirmParamRefs = confirmParams.map((p) => (p as JsonRecord).$ref);
+    expect(confirmParamRefs).toContain("#/components/parameters/IfMatch");
+    expect(confirmParamRefs).toContain("#/components/parameters/IdempotencyKey");
+    const confirmResult = schemas.ConfirmIntakeDraftResult as JsonRecord;
+    expect(confirmResult.required).toEqual([
+      "serviceRequestId",
+      "requestNo",
+      "draftId",
+      "draftStatus",
+      "status",
+      "replayed",
+    ]);
+
+    // Dismiss carries If-Match but NO Idempotency-Key (the RPC makes it idempotent);
+    // it only ever returns 200 with the dismiss envelope.
+    expect(responseRef("/organizations/{orgId}/intake-drafts/{id}/actions/dismiss", "post", "200")).toBe(
+      "#/components/schemas/DismissIntakeDraftEnvelope",
+    );
+    const dismissParams = (
+      paths["/organizations/{orgId}/intake-drafts/{id}/actions/dismiss"] as JsonRecord
+    ).parameters as unknown[];
+    const dismissParamRefs = dismissParams.map((p) => (p as JsonRecord).$ref);
+    expect(dismissParamRefs).toContain("#/components/parameters/IfMatch");
+    expect(dismissParamRefs).not.toContain("#/components/parameters/IdempotencyKey");
+    expect((schemas.DismissIntakeDraftResult as JsonRecord).required).toEqual([
+      "draftId",
+      "draftStatus",
+      "replayed",
+    ]);
+
+    // The internal extraction worker is worker-bearer guarded (no staff session/CSRF)
+    // and returns the claimed/succeeded/degraded counter envelope.
+    expect(security("/internal/workers/intake-extraction", "post")).toEqual([
+      { workerBearer: [] },
+    ]);
+    expect(responseRef("/internal/workers/intake-extraction", "post", "200")).toBe(
+      "#/components/schemas/IntakeExtractionEnvelope",
+    );
+    expect((schemas.IntakeExtractionSummary as JsonRecord).required).toEqual([
+      "claimed",
+      "succeeded",
+      "degraded",
+    ]);
   });
 });

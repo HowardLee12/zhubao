@@ -50,6 +50,7 @@ tags:
   - name: Organizations
   - name: Customers
   - name: Service requests
+  - name: Intake drafts
   - name: Public intake
   - name: Projects
   - name: Work orders
@@ -1027,6 +1028,132 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PilotServiceRequestPhotoListEnvelope"
+
+  /organizations/{orgId}/intake-drafts:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    get:
+      tags: [Intake drafts]
+      operationId: listIntakeDrafts
+      summary: List the org's LINE intake-draft inbox (待確認進件草稿)
+      description: |
+        Owner/admin/dispatcher-gated read of the AI-or-manual drafts distilled from
+        LINE conversations. RLS scopes the rows to the path organization; a member of
+        another org, or a member without the role, simply sees no rows. Read-only, no
+        CSRF. A draft is never an action: confirm turns it into a service request that a
+        human triages; dismiss drops it.
+      parameters:
+        - name: status
+          in: query
+          description: Inbox filter; defaults to the pending-review queue.
+          schema:
+            $ref: "#/components/schemas/IntakeDraftStatus"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        <<: *standardErrors
+        "200":
+          description: Intake-draft inbox cards.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeDraftListEnvelope"
+
+  /organizations/{orgId}/intake-drafts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+      - $ref: "#/components/parameters/ResourceId"
+    get:
+      tags: [Intake drafts]
+      operationId: getIntakeDraft
+      summary: Get one intake draft's review detail
+      description: |
+        The read-only-left / editable-right review projection: the immutable
+        original-message timeline, the AI per-field map with provenance and per-field
+        confidence, and the missing fields. Image attachments carry only a short-lived
+        signed URL — a private storage path is never returned. RLS scopes the read; a
+        draft not visible to the caller is a non-leaky 404. Read-only, no CSRF.
+      responses:
+        <<: *standardErrors
+        "200":
+          description: Intake-draft review detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeDraftDetailEnvelope"
+
+  /organizations/{orgId}/intake-drafts/{id}/actions/confirm:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+      - $ref: "#/components/parameters/ResourceId"
+      - $ref: "#/components/parameters/IfMatch"
+      - $ref: "#/components/parameters/IdempotencyKey"
+    post:
+      tags: [Intake drafts]
+      operationId: confirmIntakeDraft
+      summary: Confirm a draft into a service request (human-in-the-loop gate)
+      description: |
+        A human turns the AI-or-manual draft into a service request (source=line). The
+        database never auto-converts. If-Match guards concurrent confirmation and the
+        Idempotency-Key replays a retried confirm; the confirm-once RPC (unique source
+        reference) makes a replay return the SAME service request. The optional body
+        carries only the per-field overrides the reviewer edited before confirming.
+      security: *employeeWriteSecurity
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmIntakeDraftRequest"
+      responses:
+        <<: *standardErrors
+        "200":
+          description: Idempotent replay of a prior confirm; the same service request is returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfirmIntakeDraftEnvelope"
+        "201":
+          description: Draft confirmed into a new service request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfirmIntakeDraftEnvelope"
+
+  /organizations/{orgId}/intake-drafts/{id}/actions/dismiss:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+      - $ref: "#/components/parameters/ResourceId"
+      - $ref: "#/components/parameters/IfMatch"
+    post:
+      tags: [Intake drafts]
+      operationId: dismissIntakeDraft
+      summary: Dismiss a spam or unparseable draft
+      description: |
+        A human drops a spam or unparseable draft. If-Match guards concurrent mutation
+        and the dismiss is idempotent — a second dismiss returns replayed=true. The
+        owner/admin/dispatcher gate is enforced inside the RPC. The optional body carries
+        a free-text reason.
+      security: *employeeWriteSecurity
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DismissIntakeDraftRequest"
+      responses:
+        <<: *standardErrors
+        "200":
+          description: Draft dismissed (or an idempotent replay of a prior dismiss).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DismissIntakeDraftEnvelope"
 
   /public/intake/{token}:
     parameters:
@@ -3720,6 +3847,39 @@ paths:
         <<: *standardErrors
         "200":
           $ref: "#/components/responses/WorkerBatchResult"
+
+  /internal/workers/intake-extraction:
+    post:
+      tags: [Intake drafts]
+      operationId: runIntakeExtractionWorkerBatch
+      summary: Claim open LINE conversations and extract intake drafts
+      description: |
+        Guarded ONLY by the shared worker bearer (no staff session, no CSRF); auth is
+        checked before the body is parsed. One pass claims open conversations with no
+        active draft, runs each through the configured AI extractor, and lets the
+        gateway map the outcome to the database. An AI failure degrades to a manual
+        draft — it never blocks intake and never fails the worker. The optional body
+        bounds the batch size; the response returns claimed/succeeded/degraded counters
+        only, never customer or draft content.
+      security:
+        - workerBearer: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeExtractionRequest"
+      responses:
+        <<: *standardErrors
+        "200":
+          description: Extraction batch counters.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeExtractionEnvelope"
 
 components:
   securitySchemes:
@@ -9356,6 +9516,331 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/RetentionReport"
+      required: [data]
+
+    IntakeDraftStatus:
+      type: string
+      enum: [pending_review, confirmed, dismissed, superseded]
+    IntakeDraftOrigin:
+      type: string
+      description: |
+        'ai' = the AI produced the summary; 'manual' = the run degraded (AI
+        unavailable) into a manual draft so the message was never lost.
+      enum: [ai, manual]
+    IntakeConfidence:
+      type: [number, "null"]
+      minimum: 0
+      maximum: 1
+    ExtractionFieldSource:
+      type: string
+      description: |
+        Provenance of a single extracted field: 'line' = verbatim from the customer,
+        'ai' = inferred/normalised by the model, 'manual' = filled in by a human.
+      enum: [line, ai, manual]
+    ExtractionField:
+      type: object
+      additionalProperties: false
+      description: One extracted field with its value, provenance and per-field confidence.
+      properties:
+        value:
+          type: string
+          maxLength: 4000
+        source:
+          $ref: "#/components/schemas/ExtractionFieldSource"
+        confidence:
+          $ref: "#/components/schemas/IntakeConfidence"
+      required: [value, source, confidence]
+    ExtractionFields:
+      type: object
+      description: |
+        Open per-field map (contactName / subject / description / phone / address /
+        serviceType …) so a template can add fields without a schema change; each value
+        carries its own provenance and confidence.
+      propertyNames:
+        minLength: 1
+        maxLength: 80
+      additionalProperties:
+        $ref: "#/components/schemas/ExtractionField"
+    IntakeDraftListItem:
+      type: object
+      additionalProperties: false
+      description: One list-view card for the 待確認進件草稿 inbox.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        conversationId:
+          $ref: "#/components/schemas/Uuid"
+        status:
+          $ref: "#/components/schemas/IntakeDraftStatus"
+        origin:
+          $ref: "#/components/schemas/IntakeDraftOrigin"
+        source:
+          type: string
+          const: line
+        title:
+          type: [string, "null"]
+        summary:
+          type: [string, "null"]
+        confidence:
+          $ref: "#/components/schemas/IntakeConfidence"
+        missingFields:
+          type: array
+          items:
+            type: string
+        lineUserId:
+          type: string
+        messageCount:
+          type: integer
+          minimum: 0
+        lastMessageAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        lockVersion:
+          $ref: "#/components/schemas/LockVersion"
+        createdAt:
+          $ref: "#/components/schemas/Timestamp"
+        updatedAt:
+          $ref: "#/components/schemas/Timestamp"
+      required:
+        - id
+        - conversationId
+        - status
+        - origin
+        - source
+        - title
+        - summary
+        - confidence
+        - missingFields
+        - lineUserId
+        - messageCount
+        - lastMessageAt
+        - lockVersion
+        - createdAt
+        - updatedAt
+    IntakeDraftListEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/IntakeDraftListItem"
+      required: [data]
+    IntakeDraftMessageAttachment:
+      type: object
+      additionalProperties: false
+      description: |
+        One image attachment on an original message. storagePath is the private-bucket
+        path used server-side; the detail route resolves a short-lived signed URL and
+        never returns a public URL.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        kind:
+          type: string
+          const: image
+        status:
+          type: string
+        storagePath:
+          type: [string, "null"]
+      required: [id, kind, status, storagePath]
+    IntakeDraftMessage:
+      type: object
+      additionalProperties: false
+      description: One immutable original message shown in the detail timeline.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        messageType:
+          type: string
+          enum: [text, image, sticker, other]
+        text:
+          type: [string, "null"]
+        sentAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        receivedAt:
+          $ref: "#/components/schemas/Timestamp"
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeDraftMessageAttachment"
+      required: [id, messageType, text, sentAt, receivedAt, attachments]
+    IntakeDraftDetail:
+      type: object
+      additionalProperties: false
+      description: The read-only-left / editable-right review projection for one draft.
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        conversationId:
+          $ref: "#/components/schemas/Uuid"
+        status:
+          $ref: "#/components/schemas/IntakeDraftStatus"
+        origin:
+          $ref: "#/components/schemas/IntakeDraftOrigin"
+        source:
+          type: string
+          const: line
+        title:
+          type: [string, "null"]
+        summary:
+          type: [string, "null"]
+        confidence:
+          $ref: "#/components/schemas/IntakeConfidence"
+        fields:
+          $ref: "#/components/schemas/ExtractionFields"
+        missingFields:
+          type: array
+          items:
+            type: string
+        lineUserId:
+          type: string
+        customerLineIdentityId:
+          type: [string, "null"]
+          format: uuid
+        convertedServiceRequestId:
+          type: [string, "null"]
+          format: uuid
+        lockVersion:
+          $ref: "#/components/schemas/LockVersion"
+        createdAt:
+          $ref: "#/components/schemas/Timestamp"
+        updatedAt:
+          $ref: "#/components/schemas/Timestamp"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntakeDraftMessage"
+      required:
+        - id
+        - conversationId
+        - status
+        - origin
+        - source
+        - title
+        - summary
+        - confidence
+        - fields
+        - missingFields
+        - lineUserId
+        - customerLineIdentityId
+        - convertedServiceRequestId
+        - lockVersion
+        - createdAt
+        - updatedAt
+        - messages
+    IntakeDraftDetailEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/IntakeDraftDetail"
+      required: [data]
+    ConfirmIntakeDraftRequest:
+      type: object
+      additionalProperties: false
+      description: |
+        Optional per-field overrides the reviewer edited before confirming. The
+        optimistic lock arrives in If-Match and the idempotency key in Idempotency-Key,
+        never in the body.
+      properties:
+        fieldOverrides:
+          $ref: "#/components/schemas/ExtractionFields"
+    ConfirmIntakeDraftResult:
+      type: object
+      additionalProperties: false
+      description: |
+        The confirm RPC envelope. replayed=true means an idempotent retry returned the
+        SAME service request rather than creating a new one.
+      properties:
+        serviceRequestId:
+          $ref: "#/components/schemas/Uuid"
+        requestNo:
+          type: string
+          minLength: 1
+          maxLength: 40
+        draftId:
+          $ref: "#/components/schemas/Uuid"
+        draftStatus:
+          $ref: "#/components/schemas/IntakeDraftStatus"
+        status:
+          type: string
+          minLength: 1
+          maxLength: 40
+        replayed:
+          type: boolean
+      required: [serviceRequestId, requestNo, draftId, draftStatus, status, replayed]
+    ConfirmIntakeDraftEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/ConfirmIntakeDraftResult"
+      required: [data]
+    DismissIntakeDraftRequest:
+      type: object
+      additionalProperties: false
+      description: Optional free-text reason (spam / unparseable). If-Match carries the lock.
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    DismissIntakeDraftResult:
+      type: object
+      additionalProperties: false
+      properties:
+        draftId:
+          $ref: "#/components/schemas/Uuid"
+        draftStatus:
+          type: string
+          const: dismissed
+        replayed:
+          type: boolean
+      required: [draftId, draftStatus, replayed]
+    DismissIntakeDraftEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/DismissIntakeDraftResult"
+      required: [data]
+    IntakeExtractionRequest:
+      type: object
+      additionalProperties: false
+      description: Optional batch bound for one extraction pass.
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 50
+    IntakeExtractionSummary:
+      type: object
+      additionalProperties: false
+      description: |
+        Counters for one extraction pass. degraded counts conversations whose AI run
+        failed and fell back to a manual draft; no customer or draft content is returned.
+      properties:
+        claimed:
+          type: integer
+          minimum: 0
+        succeeded:
+          type: integer
+          minimum: 0
+        degraded:
+          type: integer
+          minimum: 0
+      required: [claimed, succeeded, degraded]
+    IntakeExtractionEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/IntakeExtractionSummary"
       required: [data]
 
     WorkerBatchRequest:

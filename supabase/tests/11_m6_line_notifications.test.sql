@@ -239,13 +239,13 @@ select is(
 -- Park the seed failed row far in the future so this section isolates the two
 -- freshly-enqueued Alpha rows; section 8 resets it to exercise retry/backoff.
 reset role;
-update public.notifications set next_attempt_at = '2030-01-01 00:00:00+00'
+update public.notifications set next_attempt_at = '2035-01-01 00:00:00+00'
   where id = '88100000-0000-4000-8000-000000000001';
 
 set local role service_role;
 -- claim with now well in the future so scheduled_at is due.
 select is(
-  jsonb_array_length(public.claim_notifications('nworker-1', 50, '2026-07-20 12:00:00+00')),
+  jsonb_array_length(public.claim_notifications('nworker-1', 50, '2030-01-01 12:00:00+00')),
   1, 'claim returns only the not_required notification, never the approval-pending one'
 );
 reset role;
@@ -265,7 +265,7 @@ select is(
 -- a re-claim finds nothing (only remaining pending row is approval-pending).
 set local role service_role;
 select is(
-  jsonb_array_length(public.claim_notifications('nworker-2', 50, '2026-07-20 12:00:00+00')),
+  jsonb_array_length(public.claim_notifications('nworker-2', 50, '2030-01-01 12:00:00+00')),
   0, 'no double-claim: the processing row is not handed to a second worker'
 );
 
@@ -314,7 +314,7 @@ select throws_ok(
 -- Drive it through the worker: claim -> retry -> claim -> retry ... to max.
 -- Deterministic p_now; full-jitter delay must fall in (p_now, p_now + base].
 
--- Un-park the seed failed row (section 6 pushed it to 2030) so it is due again.
+-- Un-park the seed failed row (section 6 pushed it to 2035) so it is due again.
 reset role;
 update public.notifications set next_attempt_at = '2026-01-05 00:05:00+00'
   where id = '88100000-0000-4000-8000-000000000001';
@@ -322,14 +322,14 @@ update public.notifications set next_attempt_at = '2026-01-05 00:05:00+00'
 set local role service_role;
 -- Claim the seed failed row (next_attempt_at 2026-01-05, so due at any 2026-07 now).
 select is(
-  jsonb_array_length(public.claim_notifications('rworker', 50, '2026-07-20 12:00:00+00')),
+  jsonb_array_length(public.claim_notifications('rworker', 50, '2030-01-01 12:00:00+00')),
   1, 'the seed failed notification is claimable (failed + due)'
 );
 
 -- attempt 2 fails (retriable): attempt_count 1 -> 2, base delay 2min.
 select is(
   public.mark_notification_retry(
-    '88100000-0000-4000-8000-000000000001', 'RATE_LIMITED', '2026-07-20 12:00:00+00'
+    '88100000-0000-4000-8000-000000000001', 'RATE_LIMITED', '2030-01-01 12:00:00+00'
   ) ->> 'status', 'failed', 'a retriable failure below max returns to a failed (re-queueable) state'
 );
 reset role;
@@ -339,12 +339,12 @@ select is(
 );
 select ok(
   (select next_attempt_at from public.notifications where id = '88100000-0000-4000-8000-000000000001')
-    > '2026-07-20 12:00:00+00'::timestamptz,
+    > '2030-01-01 12:00:00+00'::timestamptz,
   'retry schedules next_attempt_at strictly in the future'
 );
 select ok(
   (select next_attempt_at from public.notifications where id = '88100000-0000-4000-8000-000000000001')
-    <= '2026-07-20 12:02:00+00'::timestamptz,
+    <= '2030-01-01 12:02:00+00'::timestamptz,
   'attempt 2 full-jitter delay is within the 2 minute ceiling'
 );
 select is(
@@ -358,13 +358,13 @@ select is(
 
 -- Drive attempts 3, 4, 5. At attempt_count 5 == max_attempts the row is terminal failed.
 set local role service_role;
-select public.claim_notifications('rworker', 50, '2026-07-21 00:00:00+00');
-select public.mark_notification_retry('88100000-0000-4000-8000-000000000001', 'RATE_LIMITED', '2026-07-21 00:00:00+00'); -- ->3
-select public.claim_notifications('rworker', 50, '2026-07-21 01:00:00+00');
-select public.mark_notification_retry('88100000-0000-4000-8000-000000000001', 'RATE_LIMITED', '2026-07-21 01:00:00+00'); -- ->4
-select public.claim_notifications('rworker', 50, '2026-07-21 02:00:00+00');
+select public.claim_notifications('rworker', 50, '2030-01-02 00:00:00+00');
+select public.mark_notification_retry('88100000-0000-4000-8000-000000000001', 'RATE_LIMITED', '2030-01-02 00:00:00+00'); -- ->3
+select public.claim_notifications('rworker', 50, '2030-01-02 01:00:00+00');
+select public.mark_notification_retry('88100000-0000-4000-8000-000000000001', 'RATE_LIMITED', '2030-01-02 01:00:00+00'); -- ->4
+select public.claim_notifications('rworker', 50, '2030-01-02 02:00:00+00');
 select is(
-  public.mark_notification_retry('88100000-0000-4000-8000-000000000001', 'RATE_LIMITED', '2026-07-21 02:00:00+00') ->> 'status',
+  public.mark_notification_retry('88100000-0000-4000-8000-000000000001', 'RATE_LIMITED', '2030-01-02 02:00:00+00') ->> 'status',
   'failed', 'the fifth attempt reports failed'
 );
 reset role;
@@ -399,7 +399,7 @@ select private.test_enqueue_customer_notification(
   '{}'::jsonb, 'm6-perm-fail-0001', null, null, 'not_required'
 );
 set local role service_role;
-select public.claim_notifications('pworker', 50, '2026-07-20 12:00:00+00');
+select public.claim_notifications('pworker', 50, '2030-01-01 12:00:00+00');
 select is(
   public.mark_notification_failed(
     (select id from public.notifications where dedupe_key = 'm6-perm-fail-0001'),
@@ -427,7 +427,7 @@ select private.test_enqueue_customer_notification(
   '{}'::jsonb, 'm6-stale-0001', null, null, 'not_required'
 );
 set local role service_role;
-select public.claim_notifications('deadworker', 50, '2026-07-20 12:00:00+00');
+select public.claim_notifications('deadworker', 50, '2030-01-01 12:00:00+00');
 reset role;
 select is(
   (select status from public.notifications where dedupe_key = 'm6-stale-0001'),
@@ -439,7 +439,7 @@ update public.notifications set locked_at = '2026-07-20 11:50:00+00'
 
 set local role service_role;
 select is(
-  public.requeue_stale_notifications('2026-07-20 12:00:00+00', 5) ->> 'requeued', '1',
+  public.requeue_stale_notifications('2030-01-01 12:00:00+00', 5) ->> 'requeued', '1',
   'the watchdog requeues one stale processing notification (>5min)'
 );
 reset role;
@@ -775,7 +775,7 @@ update public.line_webhook_events set max_attempts = 2 where webhook_event_id = 
 
 set local role service_role;
 -- attempt 1: claim -> fail. Below ceiling (1 < 2): stays failed, re-queueable.
-select public.claim_line_webhook_events('wt-worker', 50, '2026-07-20 12:00:00+00');
+select public.claim_line_webhook_events('wt-worker', 50, '2030-01-01 12:00:00+00');
 select public.mark_webhook_failed(
   (select id from public.line_webhook_events where webhook_event_id = 'wh-terminal-0001'),
   'PROVIDER_5XX'
@@ -792,7 +792,7 @@ select ok(
 
 -- attempt 2: claim (due) -> fail. At ceiling (2 >= 2): terminal.
 set local role service_role;
-select public.claim_line_webhook_events('wt-worker', 50, '2026-07-20 13:00:00+00');
+select public.claim_line_webhook_events('wt-worker', 50, '2030-01-01 13:00:00+00');
 select is(
   public.mark_webhook_failed(
     (select id from public.line_webhook_events where webhook_event_id = 'wh-terminal-0001'),
@@ -813,7 +813,7 @@ select ok(
 set local role service_role;
 select is(
   (select coalesce(sum((e ->> 'webhookEventId' = 'wh-terminal-0001')::int), 0)::int
-     from jsonb_array_elements(public.claim_line_webhook_events('wt-worker', 50, '2027-01-01 00:00:00+00')) e),
+     from jsonb_array_elements(public.claim_line_webhook_events('wt-worker', 50, '2030-01-02 00:00:00+00')) e),
   0, 'a webhook event that exhausted max_attempts is never re-claimed'
 );
 
@@ -830,7 +830,7 @@ select public.ingest_line_webhook_event(
   '{"events":[{"type":"message","webhookEventId":"wh-stale-0001"}]}'::jsonb,
   repeat('e', 64)
 );
-select public.claim_line_webhook_events('ws-worker', 50, '2026-07-20 12:00:00+00');
+select public.claim_line_webhook_events('ws-worker', 50, '2030-01-01 12:00:00+00');
 reset role;
 select is(
   (select status from public.line_webhook_events where webhook_event_id = 'wh-stale-0001'),
@@ -842,7 +842,7 @@ update public.line_webhook_events set locked_at = '2026-07-20 11:50:00+00'
 
 set local role service_role;
 select is(
-  public.requeue_stale_line_webhook_events('2026-07-20 12:00:00+00', 5) ->> 'requeued', '1',
+  public.requeue_stale_line_webhook_events('2030-01-01 12:00:00+00', 5) ->> 'requeued', '1',
   'the inbox watchdog requeues one stale processing webhook event (>5min)'
 );
 reset role;

@@ -561,6 +561,83 @@ Append-only：`id, notification_id, organization_id, attempt_no, started_at, fin
 - unique `(line_channel_id, webhook_event_id)`；若 provider 無 id，使用 `(line_channel_id, payload_sha256, event_timestamp)` fallback。
 - claim partial index同 outbox；payload 90 天 retention。
 
+### 8.7 M7 — 自由訊息聚合與 AI 整理草稿
+
+M7 把 LINE 裡的自由文字／圖片訊息聚合成「待確認進件草稿」（intake draft），由 AI 只出草稿、人工 confirm 每一步。**核心不變量：AI extractor 故障（down／timeout／壞輸出）時，訊息仍以 `origin='manual'` 草稿落地，永不遺失**（降級 gate 落在 DB 層，見 ADR 0007）。
+
+migration：`supabase/migrations/202607200008_v2_m7_intake_aggregation.sql`；pgTAP：`supabase/tests/13_m7_intake_aggregation.test.sql`。五張新表全部 `FORCE ROW LEVEL SECURITY`、`REVOKE ALL FROM public, anon, authenticated, service_role`，只授 `authenticated` SELECT（owner/admin/dispatcher RLS-scoped inbox 讀取），所有 mutation 一律經 security-definer RPC。
+
+#### `conversations`（aggregate root）
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| id / organization_id | uuid | aggregate root，`(organization_id, id)` unique |
+| line_channel_id | uuid | composite FK 帶 organization_id |
+| customer_line_identity_id | uuid nullable | 配對後帶入；composite FK |
+| line_user_id | text | 配對前的聚合 key，`1..255` |
+| status | text default `open` | `open/drafted/converted/dismissed` |
+| last_message_at | timestamptz nullable |  |
+| message_count | integer default 0 | `>= 0` |
+| created_at / updated_at / lock_version |  | mutable aggregate |
+
+- **partial unique** `(organization_id, line_channel_id, line_user_id) WHERE status='open'`：同一 sender 同時只有一個 open conversation，連續訊息 coalesce。
+- confirm/dismiss 後離開 `open`，之後的新訊息開新 conversation。
+
+#### `inbound_messages`（append-only child）
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| id / organization_id | uuid | `(organization_id, id)` unique |
+| conversation_id | uuid | composite FK |
+| line_channel_id | uuid | composite FK |
+| line_webhook_event_id | uuid nullable | provenance FK → `line_webhook_events` |
+| line_message_id | text nullable | `1..120` |
+| message_type | text | `text/image/sticker/other` |
+| text_content | text nullable | `<= 20000`，**write-once** |
+| raw | jsonb | 原始 message object，`<= 256 KB`，**write-once** |
+| sent_at / received_at / created_at | timestamptz |  |
+
+- **dedup unique** `(organization_id, line_channel_id, line_message_id) WHERE line_message_id is not null`。
+- **write-once guard trigger** `b_guard_inbound_message_immutable`（鏡射 `private.guard_original_submission`）：`raw`／`text_content` 於 UPDATE 被拒，`errcode P0001 / INBOUND_MESSAGE_IMMUTABLE`。
+
+#### `message_attachments`（media child，private bucket）
+
+`id, organization_id, inbound_message_id`（composite FK）、`kind`（`image`）、`status`（`pending/processing/ready/quarantined/failed/deleted`）、`storage_bucket`（固定 `v2-intake-photos`）、`storage_path nullable, thumbnail_path nullable, content_hash`（`^[0-9a-f]{64}$`）、`mime_type`（`image/jpeg|png|webp`）、`byte_size`（`1..10 MB`）、`created_at`。`ready` 需 storage_path/content_hash/mime_type/byte_size 齊備。storage_path unique。只用短效 signed URL，不公開。
+
+#### `intake_extraction_runs`（append-only 稽核 + extraction inbox）
+
+`id, organization_id, conversation_id`（composite FK）、`intake_draft_id nullable`、`extractor_name`（`fake/fireworks`）、`model_version nullable`、`status`（`succeeded/failed/degraded`）、`confidence numeric(4,3) [0,1] nullable`、`input_message_ids uuid[]`、`output jsonb nullable (<= 64 KB)`、`error_code nullable`、`latency_ms nullable`、`started_at/finished_at/created_at`。append-only trigger `immutable_intake_extraction_runs`（`errcode P0001 / APPEND_ONLY_RECORD`）。**failed run 不記 confidence／output**。
+
+#### `intake_drafts`（待確認進件草稿）
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| id / organization_id | uuid | `(organization_id, id)` unique |
+| conversation_id | uuid | composite FK |
+| status | text default `pending_review` | `pending_review/confirmed/dismissed/superseded` |
+| origin | text | `ai`（AI 出草稿）／`manual`（降級草稿）— 滿足「顯示來源」gate |
+| confidence | numeric(4,3) nullable | 整體，`[0,1]` |
+| fields | jsonb default `{}` | **每欄 provenance** `{ value, source: 'line'\|'ai'\|'manual', confidence }`，`<= 64 KB` |
+| summary / title | text nullable | `<= 4000` / `<= 160` |
+| missing_fields | text[] default `{}` |  |
+| extraction_run_id | uuid nullable | composite FK → runs |
+| converted_service_request_id | uuid nullable | confirm 後連結；composite FK |
+| created_at / updated_at / lock_version |  | mutable aggregate |
+
+- **partial unique** `(organization_id, conversation_id) WHERE status='pending_review'`：一 conversation 一 active draft。
+- `status='confirmed'` 必須有 `converted_service_request_id`。
+
+#### events allowlist 擴充
+
+`events_aggregate_type_chk` 加入 `'conversation'`、`'intake_draft'`（同 M3 加 `'customer'`）。`actor_type` 已含 `line/system`。confirm/dismiss 各 append 一筆 `intake_draft.confirmed` / `intake_draft.dismissed` hash-chained 事件。
+
+#### transaction RPC（見 §12 一覽）
+
+- **worker（service_role only）**：`ingest_inbound_message`、`attach_message_media`、`record_extraction_run`、`create_intake_draft`、`claim_intake_extraction_runs`（SKIP LOCKED）、`mark_extraction_succeeded`、`mark_extraction_failed`。
+- **staff（authenticated，內部 has_org_role gate）**：`confirm_intake_draft`、`dismiss_intake_draft`。
+- **降級 gate**：`record_extraction_run(status='failed')` 在同一 transaction 寫 failed run **並** upsert `origin='manual'` 草稿；`mark_extraction_failed` 為其薄封裝。
+- **confirm-once**：`confirm_intake_draft` 建 `service_request(source='line', source_reference=conversation_id, customer_line_identity_id, original_submission=草稿快照)`，並靠既有 `service_requests (organization_id, source, source_reference)` partial unique 保證重放回傳同一 service_request；之後由 UI 走 M3 `triage/convert`（service_requests 無需改 schema）。
+
 ## 9. 支援資料表
 
 ### 9.1 `public_access_tokens`
@@ -730,6 +807,8 @@ org/{organization_id}/service-requests/{request_id}/{photo_id}/original.webp
 - `enqueue_notification`
 - `claim_notifications`
 - `claim_line_webhook_events`
+- M7 worker（service_role）：`ingest_inbound_message`、`attach_message_media`、`record_extraction_run`、`create_intake_draft`、`claim_intake_extraction_runs`、`mark_extraction_succeeded`、`mark_extraction_failed`
+- M7 staff（authenticated，內部 has_org_role gate）：`confirm_intake_draft`、`dismiss_intake_draft`
 
 每個 exposed RPC 必須：驗證 `auth.uid()`（公開 token RPC 除外）、組織、role、狀態、lock version；固定 search_path；禁止 dynamic SQL；失敗時 raise 可映射的 domain error code。
 
@@ -771,6 +850,8 @@ Pilot staff route 不具 base-table privilege，也不得以 service role 補讀
 
 `seed.sql` 建立：一個 demo 組織、六種角色、兩位客戶、三個地址、設備、各狀態 request/work order、兩版報價、追加單、付款節點、保養方案及失敗通知。只用明顯假資料；不得出現正式 LINE id、電話、地址或 token。
 
+M7（`202607200008_v2_m7_intake_aggregation.sql`）接在 M6 之後：conversations／inbound_messages／message_attachments／intake_extraction_runs／intake_drafts、guard/append-only triggers、events allowlist 擴充、worker+staff RPC。沿用 M6 `line_webhook_events` 既有 dedup 落地列（不改 webhook edge）與 M2 photo pipeline 供 LINE image 下載。
+
 ## 15. Schema 驗收清單
 
 - [ ] 空資料庫可用單一指令套用所有 v2 migrations。
@@ -784,3 +865,7 @@ Pilot staff route 不具 base-table privilege，也不得以 service role 補讀
 - [ ] transaction RPC 失敗時 parent/items/event/outbox 全部回滾。
 - [ ] cursor list query 命中預期 composite index。
 - [ ] private media 無永久 public URL。
+- [ ] M7：AI extraction 失敗仍以 `origin='manual'` 草稿落地，inbound 訊息完整、run 標 `failed`（降級 gate）。
+- [ ] M7：同 sender 連續訊息聚合成一 open conversation、一 active draft；同 `line_message_id` 重送不建重複訊息。
+- [ ] M7：`inbound_messages.raw/text_content` write-once；`intake_extraction_runs` append-only。
+- [ ] M7：confirm 建 `service_request(source='line')`，重放回傳同一 request（confirm-once）；跨租戶 confirm 被拒。

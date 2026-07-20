@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { fetchPilotInbox, fetchPilotSession, PilotApiError, type PilotInboxItem } from "./api";
+import {
+  fetchIntakeDrafts,
+  fetchPilotInbox,
+  fetchPilotSession,
+  PilotApiError,
+  type PilotInboxItem,
+} from "./api";
+import { toPilotInboxItemFromDraft } from "@/schemas/pilot-inbox";
 import { PilotBrand, PilotButton, PilotCard, PilotError, PilotLoading, PilotPage } from "./ui";
 
 type InboxTab = "pending" | "triaged" | "all";
@@ -53,7 +60,17 @@ const statusLabels: Record<PilotInboxItem["status"], string> = {
 
 const sourceLabels: Record<PilotInboxItem["source"], string> = {
   web: "公開表單",
+  line: "LINE",
 };
+
+// LINE draft rows link to the dedicated review screen (待確認 · LINE), where a human
+// confirms the AI/manual draft into a service_request; web rows go straight to the
+// triage detail. A draft carries draftId; web rows use the service_request id.
+function inboxItemHref(item: PilotInboxItem): string {
+  return item.source === "line" && item.draftId
+    ? `/app/inbox/drafts/${item.draftId}`
+    : `/app/inbox/${item.id}`;
+}
 
 interface LoadedPage {
   items: PilotInboxItem[];
@@ -125,15 +142,29 @@ export function PilotInbox({ now = defaultNow }: Readonly<{ now?: () => Date }>)
         organizationId = activeMembership.organizationId;
       }
 
-      const page = await fetchPilotInbox(organizationId, {
-        status: tabDefinition(tab).status,
-      });
+      // The pending tab also surfaces LINE intake drafts (待確認 · LINE) so a human
+      // confirms them into service requests. Draft loading is best-effort: a failure
+      // there never hides the web requests (and never blocks intake) — the drafts
+      // simply don't appear this pass. Web-only tabs (triaged/all) skip the draft
+      // fetch entirely.
+      const includeDrafts = tab === "pending";
+      const [page, draftItems] = await Promise.all([
+        fetchPilotInbox(organizationId, { status: tabDefinition(tab).status }),
+        includeDrafts
+          ? fetchIntakeDrafts(organizationId, { status: "pending_review" })
+              .then((drafts) => drafts.map((draft) => toPilotInboxItemFromDraft(draft)))
+              .catch(() => [] as PilotInboxItem[])
+          : Promise.resolve([] as PilotInboxItem[]),
+      ]);
+      // Drafts first (newest intake awaiting confirmation sits on top), then the
+      // web service requests for this tab.
+      const merged = [...draftItems, ...page.data];
       setState((current) => ({
         ...current,
         status: "ready",
         tab,
         organizationId,
-        page: { items: page.data, nextCursor: page.meta.nextCursor, hasMore: page.meta.hasMore },
+        page: { items: merged, nextCursor: page.meta.nextCursor, hasMore: page.meta.hasMore },
       }));
     } catch (error) {
       if (error instanceof PilotApiError && error.status === 403) {
@@ -274,9 +305,15 @@ export function PilotInbox({ now = defaultNow }: Readonly<{ now?: () => Date }>)
                       {sourceLabels[item.source]} · {item.referenceNo}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-ink-2">
-                        {statusLabels[item.status]}
-                      </span>
+                      {item.source === "line" ? (
+                        <span className="rounded-full bg-orange px-2.5 py-1 text-[11px] font-bold text-white">
+                          待確認 · LINE
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-ink-2">
+                          {statusLabels[item.status]}
+                        </span>
+                      )}
                       <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--warm-red)]">
                         {formatWaitingTime(item.createdAt, now())}
                       </span>
@@ -284,12 +321,27 @@ export function PilotInbox({ now = defaultNow }: Readonly<{ now?: () => Date }>)
                   </div>
                   <div className="p-5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-bg-warm px-2.5 py-1 text-xs font-bold text-ink-2">
-                        {item.category ?? "未分類"}
-                      </span>
-                      <span className="text-xs font-semibold text-ink-3">
-                        {item.serviceName ?? "未指定服務"}
-                      </span>
+                      {item.source === "line" ? (
+                        <>
+                          <span className="rounded-full bg-bg-warm px-2.5 py-1 text-xs font-bold text-ink-2">
+                            {item.origin === "manual" ? "AI 整理失敗" : "AI 已整理"}
+                          </span>
+                          {typeof item.confidence === "number" ? (
+                            <span className="text-xs font-semibold text-ink-3">
+                              信心 {Math.round(item.confidence * 100)}%
+                            </span>
+                          ) : null}
+                        </>
+                      ) : (
+                        <>
+                          <span className="rounded-full bg-bg-warm px-2.5 py-1 text-xs font-bold text-ink-2">
+                            {item.category ?? "未分類"}
+                          </span>
+                          <span className="text-xs font-semibold text-ink-3">
+                            {item.serviceName ?? "未指定服務"}
+                          </span>
+                        </>
+                      )}
                     </div>
                     <h2 className="mt-3 text-lg font-black leading-6 tracking-tight text-ink">
                       {item.title}
@@ -298,34 +350,46 @@ export function PilotInbox({ now = defaultNow }: Readonly<{ now?: () => Date }>)
                       {item.description}
                     </p>
 
-                    <dl className="mt-4 space-y-2 rounded-2xl bg-[#fbf8f3] p-3.5 text-sm">
-                      <div className="flex gap-2">
-                        <dt className="w-14 shrink-0 font-semibold text-ink-3">聯絡人</dt>
-                        <dd className="font-bold text-ink-2">{item.contactName}</dd>
-                      </div>
-                      <div className="flex gap-2">
-                        <dt className="w-14 shrink-0 font-semibold text-ink-3">電話</dt>
-                        <dd className="font-bold text-ink-2">
-                          <a href={`tel:${item.contactPhone}`} className="text-orange-deep underline">
-                            {item.contactPhone}
-                          </a>
-                        </dd>
-                      </div>
-                      <div className="flex gap-2">
-                        <dt className="w-14 shrink-0 font-semibold text-ink-3">地址</dt>
-                        <dd className="text-ink-2">{item.address ?? "尚未提供"}</dd>
-                      </div>
-                      <div className="flex gap-2">
-                        <dt className="w-14 shrink-0 font-semibold text-ink-3">附件</dt>
-                        <dd className="text-ink-2">{item.photoCount} 張照片</dd>
-                      </div>
-                    </dl>
+                    {item.source === "line" ? (
+                      <dl className="mt-4 space-y-2 rounded-2xl bg-[#fbf8f3] p-3.5 text-sm">
+                        <div className="flex gap-2">
+                          <dt className="w-16 shrink-0 font-semibold text-ink-3">LINE 用戶</dt>
+                          <dd className="break-all font-bold text-ink-2">{item.contactName}</dd>
+                        </div>
+                      </dl>
+                    ) : (
+                      <dl className="mt-4 space-y-2 rounded-2xl bg-[#fbf8f3] p-3.5 text-sm">
+                        <div className="flex gap-2">
+                          <dt className="w-14 shrink-0 font-semibold text-ink-3">聯絡人</dt>
+                          <dd className="font-bold text-ink-2">{item.contactName}</dd>
+                        </div>
+                        <div className="flex gap-2">
+                          <dt className="w-14 shrink-0 font-semibold text-ink-3">電話</dt>
+                          <dd className="font-bold text-ink-2">
+                            <a
+                              href={`tel:${item.contactPhone}`}
+                              className="text-orange-deep underline"
+                            >
+                              {item.contactPhone}
+                            </a>
+                          </dd>
+                        </div>
+                        <div className="flex gap-2">
+                          <dt className="w-14 shrink-0 font-semibold text-ink-3">地址</dt>
+                          <dd className="text-ink-2">{item.address ?? "尚未提供"}</dd>
+                        </div>
+                        <div className="flex gap-2">
+                          <dt className="w-14 shrink-0 font-semibold text-ink-3">附件</dt>
+                          <dd className="text-ink-2">{item.photoCount} 張照片</dd>
+                        </div>
+                      </dl>
+                    )}
 
                     <a
-                      href={`/app/inbox/${item.id}`}
+                      href={inboxItemHref(item)}
                       className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-orange px-4 text-sm font-bold text-white shadow-[0_10px_25px_rgba(226,105,31,0.22)] transition hover:bg-orange-deep"
                     >
-                      查看並整理進件
+                      {item.source === "line" ? "確認 LINE 進件" : "查看並整理進件"}
                     </a>
                   </div>
                 </article>

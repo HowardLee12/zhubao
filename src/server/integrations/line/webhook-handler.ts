@@ -37,6 +37,70 @@ function targetStatusFor(eventType: string): FriendStatus | null {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// M7 message branch: a pure decision that turns a claimed LINE 'message' webhook
+// payload into an ingest command (find-or-create conversation + append message) or
+// an ignore reason. No I/O — the gateway loads the claimed row, calls this, then
+// invokes ingest_inbound_message (and, for images, the content fetcher). Group/room
+// messages are ignored (no per-user identity to aggregate); non-message events fall
+// through to the M6 follow/unfollow path.
+
+export type InboundMessageType = "text" | "image" | "sticker" | "other";
+
+export type MessageIngestDecision =
+  | {
+      action: "ingest";
+      lineUserId: string;
+      lineMessageId: string;
+      messageType: InboundMessageType;
+      textContent: string | null;
+      isImage: boolean;
+    }
+  | {
+      action: "ignore";
+      reason: "not_a_message" | "missing_sender" | "missing_message_id";
+    };
+
+function mapMessageType(subtype: unknown): InboundMessageType {
+  if (subtype === "text") return "text";
+  if (subtype === "image") return "image";
+  if (subtype === "sticker") return "sticker";
+  return "other";
+}
+
+export function decideMessageIngest(payload: Record<string, unknown>): MessageIngestDecision {
+  if (payload.type !== "message") {
+    return { action: "ignore", reason: "not_a_message" };
+  }
+
+  // Only 1:1 user messages carry a line_user_id we can aggregate a conversation on;
+  // group/room messages have no stable per-customer sender for intake.
+  const source = payload.source as { type?: unknown; userId?: unknown } | undefined;
+  const userId = source?.userId;
+  if (source?.type !== "user" || typeof userId !== "string" || userId.length === 0) {
+    return { action: "ignore", reason: "missing_sender" };
+  }
+
+  const message = payload.message as { id?: unknown; type?: unknown; text?: unknown } | undefined;
+  const messageId = message?.id;
+  if (typeof messageId !== "string" || messageId.length === 0) {
+    return { action: "ignore", reason: "missing_message_id" };
+  }
+
+  const messageType = mapMessageType(message?.type);
+  const textContent =
+    messageType === "text" && typeof message?.text === "string" ? message.text : null;
+
+  return {
+    action: "ingest",
+    lineUserId: userId,
+    lineMessageId: messageId,
+    messageType,
+    textContent,
+    isImage: messageType === "image",
+  };
+}
+
 export function decideWebhookApply(facts: WebhookApplyFacts): WebhookApplyDecision {
   const next = targetStatusFor(facts.eventType);
   if (next === null) {

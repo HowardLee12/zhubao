@@ -60,6 +60,31 @@ function inboxPage(items: unknown[], meta: { nextCursor: string | null; hasMore:
   return jsonResponse({ data: items, meta });
 }
 
+function draftListResponse(items: unknown[] = []) {
+  return jsonResponse({ data: items });
+}
+
+function draftItem(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "90000000-0000-4000-8000-000000000001",
+    conversationId: "a0000000-0000-4000-8000-000000000001",
+    status: "pending_review",
+    origin: "ai",
+    source: "line",
+    title: "LINE 進件（AI 摘要）",
+    summary: "冷氣不冷想約人來看",
+    confidence: 0.82,
+    missingFields: ["contactPhone"],
+    lineUserId: "Uline-alpha-customer-0001",
+    messageCount: 2,
+    lastMessageAt: "2026-07-18T02:00:00.000Z",
+    lockVersion: 1,
+    createdAt: "2026-07-18T02:05:00.000Z",
+    updatedAt: "2026-07-18T02:05:00.000Z",
+    ...overrides,
+  };
+}
+
 describe("PilotInbox", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -69,7 +94,8 @@ describe("PilotInbox", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(sessionResponse())
-      .mockResolvedValueOnce(inboxPage([inboxItem()], { nextCursor: null, hasMore: false }));
+      .mockResolvedValueOnce(inboxPage([inboxItem()], { nextCursor: null, hasMore: false }))
+      .mockResolvedValueOnce(draftListResponse());
     vi.stubGlobal("fetch", fetchMock);
 
     render(<PilotInbox now={() => new Date("2026-07-16T02:00:00.000Z")} />);
@@ -99,6 +125,7 @@ describe("PilotInbox", () => {
       .fn()
       .mockResolvedValueOnce(sessionResponse())
       .mockResolvedValueOnce(inboxPage([inboxItem()], { nextCursor: null, hasMore: false }))
+      .mockResolvedValueOnce(draftListResponse())
       .mockResolvedValueOnce(
         inboxPage(
           [inboxItem({ id: "80000000-0000-4000-8000-000000000002", status: "triaged", title: "已分流案件" })],
@@ -113,7 +140,8 @@ describe("PilotInbox", () => {
     await userEvent.click(screen.getByRole("tab", { name: /已分流/ }));
 
     expect(await screen.findByRole("heading", { name: "已分流案件" })).toBeInTheDocument();
-    const triagedCall = fetchMock.mock.calls[2][0] as string;
+    // The triaged tab is web-only (no draft fetch), so the tab request is call 3.
+    const triagedCall = fetchMock.mock.calls[3][0] as string;
     expect(triagedCall).toContain("status=triaged");
   });
 
@@ -127,6 +155,7 @@ describe("PilotInbox", () => {
           hasMore: true,
         }),
       )
+      .mockResolvedValueOnce(draftListResponse())
       .mockResolvedValueOnce(
         inboxPage(
           [inboxItem({ id: "80000000-0000-4000-8000-000000000009", title: "第二頁案件" })],
@@ -143,7 +172,8 @@ describe("PilotInbox", () => {
     expect(await screen.findByRole("heading", { name: "第二頁案件" })).toBeInTheDocument();
     // Both pages remain visible (append, not replace).
     expect(screen.getByRole("heading", { name: "第一頁案件" })).toBeInTheDocument();
-    const loadMoreCall = fetchMock.mock.calls[2][0] as string;
+    // Load-more is web-only (no draft refetch), so it is call 3.
+    const loadMoreCall = fetchMock.mock.calls[3][0] as string;
     expect(loadMoreCall).toContain("cursor=cursor-token-abc");
     // No more pages -> the button disappears.
     expect(screen.queryByRole("button", { name: "載入更多" })).not.toBeInTheDocument();
@@ -155,7 +185,8 @@ describe("PilotInbox", () => {
       vi
         .fn()
         .mockResolvedValueOnce(sessionResponse())
-        .mockResolvedValueOnce(inboxPage([], { nextCursor: null, hasMore: false })),
+        .mockResolvedValueOnce(inboxPage([], { nextCursor: null, hasMore: false }))
+        .mockResolvedValueOnce(draftListResponse()),
     );
 
     render(<PilotInbox />);
@@ -168,8 +199,10 @@ describe("PilotInbox", () => {
       .fn()
       .mockResolvedValueOnce(sessionResponse())
       .mockResolvedValueOnce(jsonResponse({ title: "暫時無法讀取" }, 503))
+      .mockResolvedValueOnce(draftListResponse())
       .mockResolvedValueOnce(sessionResponse())
-      .mockResolvedValueOnce(inboxPage([], { nextCursor: null, hasMore: false }));
+      .mockResolvedValueOnce(inboxPage([], { nextCursor: null, hasMore: false }))
+      .mockResolvedValueOnce(draftListResponse());
     vi.stubGlobal("fetch", fetchMock);
 
     render(<PilotInbox />);
@@ -178,7 +211,8 @@ describe("PilotInbox", () => {
     await userEvent.click(screen.getByRole("button", { name: "重新載入" }));
 
     expect(await screen.findByRole("heading", { name: "目前沒有待處理的進件" })).toBeInTheDocument();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    // Failing attempt (session + inbox + drafts) then retry (session + inbox + drafts).
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
   });
 
   it("shows a restricted view to technicians without dispatch access", async () => {
@@ -201,7 +235,8 @@ describe("PilotInbox", () => {
       vi
         .fn()
         .mockResolvedValueOnce(sessionResponse())
-        .mockResolvedValueOnce(jsonResponse({ title: "沒有權限" }, 403)),
+        .mockResolvedValueOnce(jsonResponse({ title: "沒有權限" }, 403))
+        .mockResolvedValueOnce(draftListResponse()),
     );
 
     render(<PilotInbox />);
@@ -214,6 +249,7 @@ describe("PilotInbox", () => {
       .fn()
       .mockResolvedValueOnce(sessionResponse())
       .mockResolvedValueOnce(inboxPage([inboxItem()], { nextCursor: null, hasMore: false }))
+      .mockResolvedValueOnce(draftListResponse())
       .mockResolvedValueOnce(
         inboxPage(
           [
@@ -234,7 +270,93 @@ describe("PilotInbox", () => {
       "article",
     ) as HTMLElement;
     expect(within(convertedCard).getByText("已轉換")).toBeInTheDocument();
-    const allCall = fetchMock.mock.calls[2][0] as string;
+    // The all tab is web-only (no draft fetch), so it is call 3.
+    const allCall = fetchMock.mock.calls[3][0] as string;
     expect(allCall).not.toContain("status=");
+  });
+
+  it("shows a 待確認 · LINE badge on draft cards and links to the draft-review screen", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(sessionResponse())
+      .mockResolvedValueOnce(inboxPage([], { nextCursor: null, hasMore: false }))
+      .mockResolvedValueOnce(draftListResponse([draftItem({ title: "LINE 冷氣進件" })]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PilotInbox />);
+
+    const draftCard = (await screen.findByRole("heading", { name: "LINE 冷氣進件" })).closest(
+      "article",
+    ) as HTMLElement;
+    // The badge marks it as a LINE draft awaiting human confirmation.
+    expect(within(draftCard).getByText("待確認 · LINE")).toBeInTheDocument();
+    // Per-field confidence surfaces on the card.
+    expect(within(draftCard).getByText(/信心 82%/)).toBeInTheDocument();
+    // The card links to the dedicated draft-review screen keyed by draft id.
+    expect(within(draftCard).getByRole("link", { name: /確認 LINE 進件/ })).toHaveAttribute(
+      "href",
+      "/app/inbox/drafts/90000000-0000-4000-8000-000000000001",
+    );
+    // The draft fetch asked for pending_review drafts.
+    const draftCall = fetchMock.mock.calls[2][0] as string;
+    expect(draftCall).toContain("/intake-drafts");
+    expect(draftCall).toContain("status=pending_review");
+  });
+
+  it("marks a degraded (manual) draft honestly and keeps it confirmable", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(sessionResponse())
+      .mockResolvedValueOnce(inboxPage([], { nextCursor: null, hasMore: false }))
+      .mockResolvedValueOnce(
+        draftListResponse([
+          draftItem({
+            title: "LINE 手動進件",
+            origin: "manual",
+            summary: "馬桶漏水",
+            confidence: null,
+          }),
+        ]),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PilotInbox />);
+
+    const draftCard = (await screen.findByRole("heading", { name: "LINE 手動進件" })).closest(
+      "article",
+    ) as HTMLElement;
+    expect(within(draftCard).getByText("AI 整理失敗")).toBeInTheDocument();
+    expect(within(draftCard).getByText("待確認 · LINE")).toBeInTheDocument();
+  });
+
+  it("renders web requests and LINE drafts together in the pending tab", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(sessionResponse())
+      .mockResolvedValueOnce(
+        inboxPage([inboxItem({ title: "公開表單進件" })], { nextCursor: null, hasMore: false }),
+      )
+      .mockResolvedValueOnce(draftListResponse([draftItem({ title: "LINE 進件卡片" })]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PilotInbox />);
+
+    expect(await screen.findByRole("heading", { name: "LINE 進件卡片" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "公開表單進件" })).toBeInTheDocument();
+  });
+
+  it("still shows web requests when the drafts fetch fails (intake never blocked)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(sessionResponse())
+      .mockResolvedValueOnce(
+        inboxPage([inboxItem({ title: "公開表單進件" })], { nextCursor: null, hasMore: false }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ title: "drafts down" }, 500));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<PilotInbox />);
+
+    expect(await screen.findByRole("heading", { name: "公開表單進件" })).toBeInTheDocument();
   });
 });

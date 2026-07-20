@@ -314,6 +314,76 @@ Convert request：
 
 `mode`：`singleVisit` 只建 work order；`project` 建 project（`projectTitle` 選填），可同時以 `workOrder` 建首張工單。`workOrder` 為兩種 mode 共用的唯一輸入。M3 尚未在 conversion transaction 寫 assignment，因此 API 會拒絕 `assigneeMembershipIds`，不會假裝成功。response 為標準 `{ "data": { serviceRequest, project|null, workOrder|null, replayed } }`；同一進件重送相同 `Idempotency-Key` 時 `replayed=true` 且回既有 case，不重複建立。
 
+## 5A. Intake drafts（M7 LINE 進件草稿）
+
+M7 把 LINE 對話蒸餾成「待確認進件草稿」inbox。草稿本身不是動作：AI 只整理與產生草稿，`confirm` 由有權限的人把草稿轉成 `service_request`（`source=line`）再進 M3 triage，`dismiss` 丟棄 spam／無法解析的草稿。`origin='ai'` 代表 AI 產出摘要，`origin='manual'` 代表 AI 不可用時降級為手動草稿，訊息永不遺失。
+
+| Method | Path | 角色 | 規格摘要 |
+|---|---|---|---|
+| GET | `/organizations/{orgId}/intake-drafts` | O/A/D | inbox 列表；query `status`（預設 `pending_review`）、`limit`（`1..100`，預設 50）；RLS 依 path org 圈定，唯讀無 CSRF |
+| GET | `.../intake-drafts/{id}` | O/A/D | review detail：不可變原始訊息 timeline + AI 逐欄位（含來源與信心）+ missing fields；圖片附件只回短效 signed URL，不回 storage path；跨租戶不可見回 404 |
+| POST | `.../intake-drafts/{id}/actions/confirm` | O/A/D | human-in-the-loop：把草稿轉成 service request；body 僅選填 `fieldOverrides`；If-Match + Idempotency-Key；replay 回同一 service request |
+| POST | `.../intake-drafts/{id}/actions/dismiss` | O/A/D | 丟棄草稿；body 僅選填 `reason`；If-Match；idempotent（第二次回 `replayed=true`），不需 Idempotency-Key |
+
+`status` 允許值：`pending_review`、`confirmed`、`dismissed`、`superseded`。列表卡片：
+
+```json
+{
+  "data": [
+    {
+      "id": "0fc3f3bf-4966-422a-a719-a52a64e662cf",
+      "conversationId": "9931f1ce-707f-4bf5-a938-e0160f65b1e5",
+      "status": "pending_review",
+      "origin": "ai",
+      "source": "line",
+      "title": "主臥冷氣不冷",
+      "summary": "客戶反映主臥冷氣運轉十分鐘後只出風。",
+      "confidence": 0.82,
+      "missingFields": ["address"],
+      "lineUserId": "Uxxxxxxxxxxxxxxxx",
+      "messageCount": 4,
+      "lastMessageAt": "2026-07-18T02:03:00Z",
+      "lockVersion": 1,
+      "createdAt": "2026-07-18T01:50:00Z",
+      "updatedAt": "2026-07-18T02:03:05Z"
+    }
+  ]
+}
+```
+
+detail 額外回 `fields`（開放的逐欄位 map，每欄 `{ value, source, confidence }`，`source` 為 `line|ai|manual`）、`customerLineIdentityId`、`convertedServiceRequestId` 與不可變的 `messages` timeline（每則含 `attachments[]`，圖片只帶短效 signed URL）。
+
+Confirm request（body 全選填）：
+
+```json
+{
+  "fieldOverrides": {
+    "contactName": { "value": "王先生", "source": "manual", "confidence": null }
+  }
+}
+```
+
+新建成功回 `201`，冪等 replay 回 `200`，兩者 body 相同：
+
+```json
+{
+  "data": {
+    "serviceRequestId": "fcb8300e-926c-44c6-957a-cf742bdd4cdf",
+    "requestNo": "SR-202607-000123",
+    "draftId": "0fc3f3bf-4966-422a-a719-a52a64e662cf",
+    "draftStatus": "confirmed",
+    "status": "new",
+    "replayed": false
+  }
+}
+```
+
+Dismiss request `{ "reason": "spam" }`（選填），回 `200`：
+
+```json
+{ "data": { "draftId": "0fc3f3bf-4966-422a-a719-a52a64e662cf", "draftStatus": "dismissed", "replayed": false } }
+```
+
 ## 6. Public intake
 
 | Method | Path | 認證 | 說明 |
@@ -697,11 +767,18 @@ Response 同時回 numerator、denominator、window 與 timezone，不只回百�
 | POST | `/internal/workers/payments:mark-overdue` | W | idempotent 狀態更新 |
 | POST | `/internal/workers/media:cleanup` | W | pending/deleted cleanup |
 | POST | `/internal/workers/tokens:cleanup` | W | expired token/key cleanup |
+| POST | `/internal/workers/intake-extraction` | W | claim 無草稿的開啟中 LINE 對話並抽取進件草稿，body 選填 `{limit:1..50}` |
 
 Worker response 只回計數與 request id，不回 payload／recipient：
 
 ```json
 { "data": { "claimed": 20, "succeeded": 18, "retried": 1, "failed": 1 } }
+```
+
+`intake-extraction` 僅由 worker bearer 保護（無 staff session、無 CSRF），且先驗身分再讀 body。一輪會 claim 沒有 active 草稿的開啟中對話、逐一過 AI extractor，再由 gateway 落庫；AI 失敗降級為 manual 草稿，不會阻擋進件也不會讓 worker 失敗。回應為專屬的 `{ claimed, succeeded, degraded }` 計數（`degraded` = AI 失敗改用手動草稿的對話數），不回任何客戶或草稿內容：
+
+```json
+{ "data": { "claimed": 5, "succeeded": 4, "degraded": 1 } }
 ```
 
 ## 19. DTO 暴露規則

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { pilotInboxRpcResultSchema, toPilotInboxItem } from "./pilot-inbox";
+import type { IntakeDraftListItem } from "./intake-draft";
+import {
+  pilotInboxRpcResultSchema,
+  toPilotInboxItem,
+  toPilotInboxItemFromDraft,
+} from "./pilot-inbox";
 
 describe("pilotInboxRpcResultSchema", () => {
   const row = {
@@ -107,5 +112,64 @@ describe("pilotInboxRpcResultSchema", () => {
     expect(mapped.serviceName).toBeNull();
     expect(mapped.category).toBeNull();
     expect(mapped.address).toBeNull();
+  });
+});
+
+describe("toPilotInboxItemFromDraft", () => {
+  function draft(overrides: Partial<IntakeDraftListItem> = {}): IntakeDraftListItem {
+    return {
+      id: "90000000-0000-4000-8000-000000000001",
+      conversationId: "a0000000-0000-4000-8000-000000000001",
+      status: "pending_review",
+      origin: "ai",
+      source: "line",
+      title: "LINE 進件（AI 摘要）",
+      summary: "冷氣不冷想約人來看",
+      confidence: 0.82,
+      missingFields: ["contactPhone"],
+      lineUserId: "Uline-alpha-customer-0001",
+      messageCount: 2,
+      lastMessageAt: "2026-07-18T02:00:00.000Z",
+      lockVersion: 3,
+      createdAt: "2026-07-18T01:59:00.000Z",
+      updatedAt: "2026-07-18T02:00:00.000Z",
+      ...overrides,
+    };
+  }
+
+  it("maps an AI draft onto a LINE inbox card", () => {
+    const item = toPilotInboxItemFromDraft(draft());
+    expect(item.source).toBe("line");
+    expect(item.origin).toBe("ai");
+    expect(item.confidence).toBe(0.82);
+    expect(item.draftId).toBe("90000000-0000-4000-8000-000000000001");
+    expect(item.conversationId).toBe("a0000000-0000-4000-8000-000000000001");
+    expect(item.draftStatus).toBe("pending_review");
+    expect(item.title).toBe("LINE 進件（AI 摘要）");
+    expect(item.lockVersion).toBe(3);
+    // LINE rows have no phone / service-request status of their own.
+    expect(item.contactPhone).toBe("");
+    expect(item.status).toBe("new");
+    expect(item.referenceNo).toContain("LINE-");
+  });
+
+  it("falls back to the summary as the title when no title exists", () => {
+    expect(toPilotInboxItemFromDraft(draft({ title: null })).title).toBe(
+      "冷氣不冷想約人來看",
+    );
+  });
+
+  it("falls back to a default title when both title and summary are null", () => {
+    const item = toPilotInboxItemFromDraft(draft({ title: null, summary: null }));
+    expect(item.title).toBe("LINE 進件");
+    expect(item.description).toBe("");
+  });
+
+  it("carries a manual (degraded) origin with null confidence", () => {
+    const item = toPilotInboxItemFromDraft(
+      draft({ origin: "manual", confidence: null, summary: null, title: null }),
+    );
+    expect(item.origin).toBe("manual");
+    expect(item.confidence).toBeNull();
   });
 });

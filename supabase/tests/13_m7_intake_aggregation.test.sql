@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(66);
+select plan(73);
 
 ------------------------------------------------------------------------------
 -- M7 — free-form LINE message aggregation into human-confirmed intake drafts,
@@ -573,6 +573,123 @@ select ok(
     where e ->> 'lineUserId' = 'Uline-alpha-customer-0001'
   ),
   'a drafted (already-acted-on) conversation is NOT re-claimed for extraction'
+);
+
+reset role;
+
+------------------------------------------------------------------------------
+-- 14. Confirm from an UNBOUND sender (conversation.customer_line_identity_id
+--     IS NULL) — the COMMON first-time-LINE-customer case. A degraded/manual
+--     draft MUST be confirmable: confirm RESOLVES-OR-CREATEs a customer + a
+--     customer_line_identity so service_requests_contact_method_chk is
+--     satisfied (no raw 500), binds the conversation, and stays confirm-once.
+------------------------------------------------------------------------------
+
+-- A brand-new sender ingested with NO identity, degraded to a manual draft.
+set local role service_role;
+
+select public.ingest_inbound_message(
+  :alpha_webhook, 'line-msg-unbound-01', 'text', '想預約洗冷氣，這是第一次聯絡',
+  '{"type":"message","message":{"id":"line-msg-unbound-01","type":"text","text":"洗冷氣"}}'::jsonb,
+  'Uline-alpha-unbound-0001', null, '2026-07-20 07:00:00+00'
+);
+
+reset role;
+
+select id as unbound_conv_id from public.conversations
+  where organization_id = :alpha_org and line_user_id = 'Uline-alpha-unbound-0001' and status = 'open'
+\gset
+select array_agg(im.id) as unbound_msg_ids from public.inbound_messages im
+  join public.conversations c on c.id = im.conversation_id
+  where c.organization_id = :alpha_org and c.line_user_id = 'Uline-alpha-unbound-0001'
+\gset
+
+set local role service_role;
+
+select public.mark_extraction_failed(
+  :alpha_org, :'unbound_conv_id', 'fake', :'unbound_msg_ids', 'AI_UNAVAILABLE', 900
+);
+
+reset role;
+
+-- Precondition: the conversation is genuinely UNBOUND before confirm.
+select is(
+  (select customer_line_identity_id from public.conversations
+   where organization_id = :alpha_org and line_user_id = 'Uline-alpha-unbound-0001'),
+  null, 'the unbound conversation carries no LINE identity before confirm'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000002', true);
+
+select is(
+  public.confirm_intake_draft(
+    :alpha_org,
+    (select d.id from public.intake_drafts d
+       join public.conversations c on c.id = d.conversation_id
+       where c.organization_id = :alpha_org and c.line_user_id = 'Uline-alpha-unbound-0001'
+         and d.status = 'pending_review'),
+    (select d.lock_version from public.intake_drafts d
+       join public.conversations c on c.id = d.conversation_id
+       where c.organization_id = :alpha_org and c.line_user_id = 'Uline-alpha-unbound-0001'
+         and d.status = 'pending_review'),
+    'idem-confirm-unbound-0001', null
+  ) ->> 'status', 'new',
+  'a degraded manual draft on an UNBOUND sender is CONFIRMED (no contact-method 500)'
+);
+
+reset role;
+
+select is(
+  (select count(*)::integer from public.service_requests
+   where organization_id = :alpha_org and source = 'line'
+     and source_reference = :'unbound_conv_id'::text),
+  1, 'confirm produced exactly one service_request for the unbound sender'
+);
+select ok(
+  (select customer_line_identity_id from public.service_requests
+   where organization_id = :alpha_org and source = 'line'
+     and source_reference = :'unbound_conv_id'::text) is not null,
+  'the service_request carries a RESOLVED customer_line_identity (contact_method_chk satisfied)'
+);
+select ok(
+  exists (
+    select 1 from public.service_requests sr
+    join public.customer_line_identities cli
+      on cli.organization_id = sr.organization_id and cli.id = sr.customer_line_identity_id
+    join public.customers cu
+      on cu.organization_id = cli.organization_id and cu.id = cli.customer_id
+    where sr.organization_id = :alpha_org and sr.source = 'line'
+      and sr.source_reference = :'unbound_conv_id'::text
+      and cu.source = 'line'
+  ),
+  'the resolved identity is backed by a newly created customer (source=line)'
+);
+select ok(
+  (select customer_line_identity_id from public.conversations
+   where organization_id = :alpha_org and line_user_id = 'Uline-alpha-unbound-0001') is not null,
+  'the conversation is now BOUND to the resolved identity going forward'
+);
+
+-- Capture the resulting service_request id, then confirm-once still holds.
+select sr.id as unbound_sr_id from public.service_requests sr
+  where sr.organization_id = :alpha_org and sr.source = 'line'
+    and sr.source_reference = :'unbound_conv_id'::text limit 1
+\gset
+select d.id as unbound_draft_id from public.intake_drafts d
+  join public.conversations c on c.id = d.conversation_id
+  where c.organization_id = :alpha_org and c.line_user_id = 'Uline-alpha-unbound-0001'
+    and d.status = 'confirmed' limit 1
+\gset
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000002', true);
+
+select is(
+  public.confirm_intake_draft(
+    :alpha_org, :'unbound_draft_id', 999, 'idem-confirm-unbound-replay', null
+  ) ->> 'serviceRequestId', :'unbound_sr_id'::text,
+  'confirm-once returns the SAME service_request for the unbound sender on replay'
 );
 
 reset role;

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { IntakeDraftListItem, IntakeDraftStatus } from "./intake-draft";
+
 const serviceRequestStatusSchema = z.enum([
   "new",
   "triaged",
@@ -61,12 +63,27 @@ export const pilotInboxRpcResultSchema = z
 export type PilotInboxRpcResult = z.infer<typeof pilotInboxRpcResultSchema>;
 export type PilotInboxRpcItem = z.infer<typeof pilotInboxRpcItemSchema>;
 
-// UI-facing inbox item. All pilot inbox rows currently originate from the public
-// web intake form, so source is fixed to "web".
+// The channel a pilot inbox row came from. "web" rows are public-form service
+// requests (M2/M3); "line" rows are AI/manual intake DRAFTS aggregated from LINE
+// messages (M7) that a human confirms into a service request before triage.
+export const pilotInboxSourceSchema = z.enum(["web", "line"]);
+export type PilotInboxSource = z.infer<typeof pilotInboxSourceSchema>;
+
+// A LINE draft's provenance: 'ai' means the model produced the summary; 'manual'
+// means the extraction degraded (AI unavailable) and a human must fill it in. The
+// message is never lost either way. Kept strict, mirroring the real draft DTO.
+export const pilotInboxOriginSchema = z.enum(["ai", "manual"]);
+export type PilotInboxOrigin = z.infer<typeof pilotInboxOriginSchema>;
+
+// UI-facing inbox item. Web rows come from the public intake form (M2/M3); LINE
+// rows are intake drafts (M7). A LINE row carries draft-only fields —
+// origin/confidence/draftStatus/draftId/conversationId — that drive the
+// "待確認 · LINE" badge and route the card to the draft-review screen instead of
+// the triage detail. Web rows leave those undefined/null.
 export interface PilotInboxItem {
   id: string;
   referenceNo: string;
-  source: "web";
+  source: PilotInboxSource;
   contactName: string;
   contactPhone: string;
   serviceName: string | null;
@@ -82,6 +99,12 @@ export interface PilotInboxItem {
   assignedMemberId: string | null;
   triagedAt: string | null;
   createdAt: string;
+  // Draft-only (source === "line"); undefined on web rows.
+  origin?: PilotInboxOrigin;
+  confidence?: number | null;
+  draftStatus?: IntakeDraftStatus;
+  draftId?: string;
+  conversationId?: string;
 }
 
 export function toPilotInboxItem(row: PilotInboxRpcItem): PilotInboxItem {
@@ -104,5 +127,39 @@ export function toPilotInboxItem(row: PilotInboxRpcItem): PilotInboxItem {
     assignedMemberId: row.assignedMemberId,
     triagedAt: row.triagedAt,
     createdAt: row.createdAt,
+  };
+}
+
+// Map a LINE intake-draft list item (the Wave 2 GET /intake-drafts DTO) onto the
+// unified inbox card shape so the pending inbox can show web requests and LINE
+// drafts side by side. Draft rows have no phone (contact is a LINE identity) and
+// no service-request status; the badge is driven by source/origin/confidence and
+// the card links to the draft-review screen keyed by draftId.
+export function toPilotInboxItemFromDraft(row: IntakeDraftListItem): PilotInboxItem {
+  const title = row.title ?? row.summary ?? "LINE 進件";
+  return {
+    id: row.id,
+    referenceNo: `LINE-${row.lineUserId.slice(-6)}`,
+    source: "line",
+    contactName: row.lineUserId,
+    contactPhone: "",
+    serviceName: null,
+    category: null,
+    title,
+    description: row.summary ?? "",
+    address: null,
+    photoCount: 0,
+    status: "new",
+    priority: "normal",
+    lockVersion: row.lockVersion,
+    customerId: null,
+    assignedMemberId: null,
+    triagedAt: null,
+    createdAt: row.createdAt,
+    origin: row.origin,
+    confidence: row.confidence,
+    draftStatus: row.status,
+    draftId: row.id,
+    conversationId: row.conversationId,
   };
 }

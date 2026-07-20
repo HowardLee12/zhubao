@@ -16,11 +16,16 @@ interface NavTab {
   exact?: boolean;
 }
 
+// Six manager tabs fit a 390px bottom nav at the 11px label size. M8 adds 收款 and
+// 回訪; 成員 leaves the persistent nav (still reachable from 設定) so the M8 surfaces
+// have a home without crowding the bar. 工作台 doubles as the KPI dashboard hub — a
+// technician never sees any of these (their tab set is separate and amount-free).
 const MANAGER_TABS: readonly NavTab[] = [
   { href: "/app", label: "工作台", exact: true },
   { href: "/app/inbox", label: "接案匣" },
   { href: "/app/schedule", label: "排程" },
-  { href: "/app/settings/team", label: "成員" },
+  { href: "/app/payments", label: "收款" },
+  { href: "/app/follow-ups", label: "回訪" },
   { href: "/app/settings", label: "設定", exact: true },
 ];
 

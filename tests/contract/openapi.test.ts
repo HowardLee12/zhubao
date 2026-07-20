@@ -68,9 +68,9 @@ describe("OpenAPI contract", () => {
       });
     });
 
-    expect(Object.keys(paths)).toHaveLength(128);
-    expect(operations).toHaveLength(169);
-    expect(Object.keys(schemas)).toHaveLength(328);
+    expect(Object.keys(paths)).toHaveLength(133);
+    expect(operations).toHaveLength(174);
+    expect(Object.keys(schemas)).toHaveLength(342);
   });
 
   it("keeps every internal reference resolvable", () => {
@@ -99,7 +99,7 @@ describe("OpenAPI contract", () => {
       });
     });
 
-    expect(operationIds).toHaveLength(169);
+    expect(operationIds).toHaveLength(174);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 

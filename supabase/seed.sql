@@ -151,6 +151,13 @@ values
     '10000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000005'
   );
 
+-- M8: give customers a phone so the data-deletion anonymization test can assert
+-- Alpha PII is scrubbed while Beta's survives (cross-tenant scoping).
+update public.customers set phone = '+886922000001'
+  where id = '40000000-0000-4000-8000-000000000001';
+update public.customers set phone = '+886933000003'
+  where id = '40000000-0000-4000-8000-000000000003';
+
 insert into public.locations (
   id, organization_id, customer_id, label, county, district, address_line, is_default,
   created_at, updated_at, created_by, updated_by
@@ -623,6 +630,76 @@ values (
     || '{"fixture": true}'::jsonb::text,
     'sha256'
   )
+);
+
+-- ---------------------------------------------------------------------------
+-- M8 fixtures. Beta-org rows so cross-tenant reject tests have a foreign target,
+-- plus an Alpha asset event history seed. Payment milestone / maintenance plan /
+-- asset for Alpha already exist above (87.., 88.., 60.. ranges).
+-- ---------------------------------------------------------------------------
+
+-- Beta project + payment milestone (foreign target for cross-tenant payment tests).
+insert into public.projects (
+  id, organization_id, project_no, customer_id, location_id, name, status,
+  contracted_amount_minor, currency, created_at, updated_at, created_by, updated_by
+)
+values (
+  '81000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000002',
+  'P-2026-0001', '40000000-0000-4000-8000-000000000003',
+  '50000000-0000-4000-8000-000000000003', 'Beta 防水工程案', 'active',
+  8000000, 'TWD', '2026-01-06 00:00:00+00', '2026-01-06 00:00:00+00',
+  '10000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000005'
+);
+
+insert into public.payment_milestones (
+  id, organization_id, project_id, name, sequence_no, amount_minor, currency,
+  due_on, status, created_at, updated_at, created_by, updated_by
+)
+values (
+  '87000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000002',
+  '81000000-0000-4000-8000-000000000002', 'Beta 第一期款', 1, 4000000, 'TWD',
+  '2026-09-01', 'pending', '2026-01-07 00:00:00+00', '2026-01-07 00:00:00+00',
+  '10000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000005'
+);
+
+-- An overdue-candidate milestone for Alpha: invoiced with a past org-local due date
+-- (2026-02-01, before "now" in most test clocks) so mark_payments_overdue has a row.
+insert into public.payment_milestones (
+  id, organization_id, project_id, name, sequence_no, amount_minor, currency,
+  due_on, status, invoiced_at, created_at, updated_at, created_by, updated_by
+)
+values (
+  '87000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000001',
+  '81000000-0000-4000-8000-000000000001', '第二期款（已請款）', 2, 2500000, 'TWD',
+  '2026-02-01', 'invoiced', '2026-01-15 00:00:00+00',
+  '2026-01-15 00:00:00+00', '2026-01-15 00:00:00+00',
+  '10000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001'
+);
+
+-- Beta asset (foreign target for cross-tenant asset tests).
+insert into public.assets (
+  id, organization_id, location_id, customer_id, asset_no, asset_type, name,
+  created_at, updated_at, created_by, updated_by
+)
+values (
+  '60000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000002',
+  '50000000-0000-4000-8000-000000000003', '40000000-0000-4000-8000-000000000003',
+  'A-2026-0001', 'pump', 'Beta 抽水馬達',
+  '2026-01-02 00:00:00+00', '2026-01-02 00:00:00+00',
+  '10000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000005'
+);
+
+-- Beta maintenance plan (foreign target for cross-tenant maintenance tests).
+insert into public.maintenance_plans (
+  id, organization_id, customer_id, location_id, asset_id, name, cadence_months,
+  lead_days, next_due_on, status, created_at, updated_at, created_by, updated_by
+)
+values (
+  '88000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000002',
+  '40000000-0000-4000-8000-000000000003', '50000000-0000-4000-8000-000000000003',
+  '60000000-0000-4000-8000-000000000002', 'Beta 馬達年度保養', 12, 14,
+  '2026-11-01', 'active', '2026-01-08 00:00:00+00', '2026-01-08 00:00:00+00',
+  '10000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000005'
 );
 
 commit;

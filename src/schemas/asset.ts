@@ -64,3 +64,53 @@ export function toAssetDto(row: AssetRow): AssetDto {
     updatedAt: row.updated_at,
   };
 }
+
+const occurredAt = z.iso.datetime({ offset: true });
+
+// M8 asset mutation request bodies. patch_asset / retire_asset gate on the
+// If-Match lock version (header). Assets are OPTIONAL and never carry cost or
+// amount — the asset DTOs are safe for the technician surface.
+export const patchAssetSchema = z
+  .object({
+    name: z.string().trim().min(1).max(160).nullable().optional(),
+    brand: z.string().max(120).nullable().optional(),
+    model: z.string().max(120).nullable().optional(),
+    serialNumber: z.string().max(120).nullable().optional(),
+    installedOn: z.iso.date().nullable().optional(),
+    warrantyExpiresOn: z.iso.date().nullable().optional(),
+    occurredAt: occurredAt.optional(),
+  })
+  .strict();
+
+export type PatchAssetInput = z.infer<typeof patchAssetSchema>;
+
+export const retireAssetSchema = z
+  .object({
+    reason: z.string().trim().min(1).max(2_000).nullable().optional(),
+    occurredAt: occurredAt.optional(),
+  })
+  .strict();
+
+export type RetireAssetInput = z.infer<typeof retireAssetSchema>;
+
+// append_asset_service_event is append-only. It records a human-authored service
+// note against the asset history projection; it never contains cost.
+export const appendAssetServiceEventSchema = z
+  .object({
+    eventType: z.enum(["serviced", "inspected", "repaired", "installed", "note"]),
+    summary: z.string().trim().min(1).max(2_000),
+    workOrderId: z.uuid().nullable().optional(),
+    servicedAt: occurredAt.nullable().optional(),
+    occurredAt: occurredAt.optional(),
+  })
+  .strict();
+
+export type AppendAssetServiceEventInput = z.infer<typeof appendAssetServiceEventSchema>;
+
+export const assetHistoryQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(200).optional(),
+  })
+  .strict();
+
+export type AssetHistoryQuery = z.infer<typeof assetHistoryQuerySchema>;

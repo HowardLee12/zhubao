@@ -284,6 +284,35 @@ Playwright 必須以 UI 與實際 API／local DB 完成 AC-C01 至 AC-C09；不�
 
 UAT evidence 包含：版本／commit、環境、角色、日期、結果、失敗 screenshot／request ID、人工協助分鐘數、已知限制與簽收者。不得把含客戶 PII 的 screenshot 放入公開 issue。
 
+## 9a. M8 驗收條件（收款追蹤、設備履歷、保養回訪、基本 KPI、Hardening）
+
+金額一律整數 minor unit、UTC 儲存、Asia/Taipei 顯示；技師 DTO 永不含金額／成本／KPI（DTO 層過濾，非前端隱藏）。
+
+**收款 payment milestone（tracking only）**
+1. 從已接受報價／完工工單建立 milestone；`pending→invoiced→paid`，並可 `waive`／`cancel`；每日 worker 依 org timezone `due_on` 把逾期 invoiced 翻 `overdue`（idempotent，terminal 不動）。
+2. `mark-paid` 不呼叫任何金流；偵測疑似卡號／CVV／銀行密碼欄位 → 422 `SENSITIVE_FIELD_REJECTED` 並記一筆不含內容的 security event。
+3. `reverse-payment` 限 owner/admin，`paid→invoiced`，金額不變，必填 reason 與 append-only event。
+4. **部分付款明確不支援**：UI 保留「部分付款」分頁但顯示誠實空狀態「尚未支援分批」；需 `payment_allocation` 表才能實作（ADR-0007 記錄的刻意偏離）。
+5. 跨租戶 milestone 一律回非外洩 404；技師讀 milestone 列表／明細不得出現 `amountMinor`／`currency`。
+
+**設備履歷 asset history（設備為選填）**
+6. 對 asset append-only service event；查看履歷 = events projection + 關聯 work_order 摘要；`DELETE` = retire 軟刪並保留履歷。
+
+**保養回訪 maintenance plan + revisit reminder**
+7. 完工建立 plan；`complete` 依 `cadence_months` 於 org timezone 重算 `next_due_on`；pause/resume/cancel。
+8. `maintenance:scan` worker 對每個到期 plan 恰 enqueue 一筆 **approval-pending** 回訪提醒 draft（idempotent，dedupe on plan+due）；draft 未經 `notifications:approve` 核准前不得被 dispatch worker claim。
+9. 一鍵把回訪轉成新 `service_request`（`source=revisit`、帶 `origin_maintenance_plan_id`、不複製舊照片）；同 asset 已有進行中案件時，`force=false` 回 409 `OPEN_REQUEST_CONFLICT` 強制人工選擇。
+10. 無自動維修承諾：AI／提醒只產草稿，送出前一律人工核准。
+
+**基本 KPI dashboard**
+11. 四指標（首次回覆時間、報價接受率、完工率、回訪率）皆回 `{numerator, denominator, window, timezone}` 與 `available`；資料不足顯示「尚無足夠資料」而非誤導的 0%。
+12. 技師永不見 dashboard／reports（RPC 角色 gate 排除 technician，回 403）；`reports/operations` 對無成本可視角色 redact 金額欄位。
+
+**Production hardening**
+13. Authenticated rate limiter：read 300／mutation 120／search_report 30（每分鐘、per user+org+action），超限回 429 且計數不因後續失敗回滾（consume-before-work）。
+14. Pilot 資料刪除：owner re-auth（raw token 只在 route 端雜湊，不進 DB／log）→ 只匿名化該 org 的 name／phone／email／address，保留交易必要 id，不觸他 org；confirm-once（finalize 重放回同一 summary）。
+15. Retention/cleanup worker 清過期上傳、raw webhook payload、匿名化 export 產物。
+
 ## 10. Traceability matrix
 
 | 使用者結果 | 主要 resource | 主要 UI | 最低自動測試 |

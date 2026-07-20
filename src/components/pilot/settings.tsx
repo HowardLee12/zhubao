@@ -230,7 +230,7 @@ export function PilotSettings() {
 
       <Link
         href="/app/notifications"
-        className="mb-5 flex items-center justify-between gap-4 rounded-[22px] border border-warm-border bg-white p-5 shadow-[0_14px_36px_rgba(74,45,20,0.07)] transition hover:border-orange/40"
+        className="mb-3 flex items-center justify-between gap-4 rounded-[22px] border border-warm-border bg-white p-5 shadow-[0_14px_36px_rgba(74,45,20,0.07)] transition hover:border-orange/40"
       >
         <span className="min-w-0">
           <span className="block text-lg font-black text-ink">通知發送紀錄</span>
@@ -239,6 +239,36 @@ export function PilotSettings() {
           </span>
         </span>
         <span aria-hidden="true" className="shrink-0 text-xl font-black text-orange">
+          →
+        </span>
+      </Link>
+
+      <Link
+        href="/app/dashboard"
+        className="mb-3 flex items-center justify-between gap-4 rounded-[22px] border border-warm-border bg-white p-5 shadow-[0_14px_36px_rgba(74,45,20,0.07)] transition hover:border-orange/40"
+      >
+        <span className="min-w-0">
+          <span className="block text-lg font-black text-ink">營運指標</span>
+          <span className="mt-1 block text-sm leading-6 text-ink-3">
+            首次回覆、報價接受率、完工率與回訪率。
+          </span>
+        </span>
+        <span aria-hidden="true" className="shrink-0 text-xl font-black text-orange">
+          →
+        </span>
+      </Link>
+
+      <Link
+        href="/app/settings/data-deletion"
+        className="mb-5 flex items-center justify-between gap-4 rounded-[22px] border border-[var(--warm-red)]/20 bg-white p-5 shadow-[0_14px_36px_rgba(74,45,20,0.07)] transition hover:border-[var(--warm-red)]/50"
+      >
+        <span className="min-w-0">
+          <span className="block text-lg font-black text-ink">刪除店家資料</span>
+          <span className="mt-1 block text-sm leading-6 text-ink-3">
+            匿名化客戶個資（僅負責人，需再次驗證身分）。
+          </span>
+        </span>
+        <span aria-hidden="true" className="shrink-0 text-xl font-black text-[var(--warm-red)]">
           →
         </span>
       </Link>

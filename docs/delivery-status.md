@@ -29,10 +29,12 @@
 | M4 | 報價、核准、安全連結與客戶接受 | Verified | 真實 DB/RPC/API/UI/public flow 全接線；310 pgTAP、21 integration、12 E2E；LINE 自動發送明確留 M6 |
 | M5 | 派工、技師任務、照片、檢查表與完工 | Verified | 排程／指派、技師任務、前後照、checklist 與人工完工全鏈路接線：`202607190004_v2_m5_work_order_ops.sql` 的 create/schedule/assign/respond/cancel/transition/photo/checklist/force-complete RPC＋`/api/v2` work-orders／assignments／schedule／photos／checklists routes＋dispatcher 排程與技師任務 UI；377 pgTAP、真實 Supabase integration、dispatcher／technician E2E；本輪 review 10 項修復落實（含 one-active-lead 分區索引負向測試改以全新成員命中正確索引、schedule board keyset 分頁不再靜默截斷）。coverage 於全軌合流後統一重測 |
 | M6 | LINE OA webhook、通知與失敗重試 | Verified | webhook 簽章驗證／重送 dedup／亂序 watermark／通知 retry 全接線並以 pgTAP＋integration 釘住；transactional outbox（enqueue→claim→attempt→retry/cancel）＋fake-adapter dispatch worker 驗證誠實 `queued` envelope；真實 LINE channel 送達仍 deferred（fake adapter 替身，release gate 5 以測試 channel 收尾） |
-| M7 | 自由訊息聚合與 AI 整理草稿 | Spec | 顯示來源／信心；AI 故障不影響進件 |
-| M8 | 收款、設備履歷、回訪、KPI 與 Pilot hardening | Spec／DB partial | 真實試點、監控、備份與刪除流程通過 |
+| M7 | 自由訊息聚合與 AI 整理草稿 | Verified（code） | LINE 對話聚合 → intake-draft inbox／review／confirm 與 worker-bearer `intake-extraction` 全接線；顯示來源／信心，AI 故障降級為 manual 草稿不阻擋進件；contract test 釘住 inbox/detail/confirm/dismiss/extraction 合約 |
+| M8 | 收款、設備履歷、回訪、KPI 與 Pilot hardening | Verified（code surface） | **已由程式驗證的 M8 gate**：付款追蹤（milestone create/invoice/mark-paid/waive/cancel/reverse，tracking-only、金額整數 minor unit、成本可見權限剝除、mark-paid 敏感欄位 422）、設備履歷（patch/retire/append-only service event、technician-safe 無成本）、維護／回訪（plan CRUD＋reminder prepare→approve、revisit 一鍵轉件帶 provenance）、Dashboard KPI（四固定 KPI 各帶 available/numerator/denominator/window/timezone）、資料刪除／retention-cleanup（owner re-auth hash、request→finalize、worker purge）、rate limiting；合約以 `202607210001_v2_m8_operations.sql`＋`/api/v2` M8 routes＋openapi/contract test 對齊。**仍為 ops-deferred 的 release gate（見下）**：真實 backup/restore 演練、真實 monitoring/alerting、真實 LINE 測試 channel、staging 跨租戶手動測試、實機驗證 |
 
-關鍵里程碑：M2 完成＝第一次真的能收單；M4 完成＝可成交；M5 完成＝真實營運流程可跑完；M6 完成＝真正 LINE-first；M7 完成＝開始降低人工整理時間。
+關鍵里程碑：M2 完成＝第一次真的能收單；M4 完成＝可成交；M5 完成＝真實營運流程可跑完；M6 完成＝真正 LINE-first；M7 完成＝開始降低人工整理時間；M8 完成＝收款／履歷／回訪／KPI 程式面就緒。
+
+> **M0–M8 全部 Verified（code）**：M0–M8 的資料庫、`/api/v2` route 與 domain／schema 已全數接線並以 pgTAP／integration／contract test 釘住。此處「Verified（code surface）」僅指程式與合約層驗證；真實試點所需的基礎設施驗收（backup/restore 演練、monitoring/alerting、真實 LINE 測試 channel、staging 跨租戶手動測試、實機驗證）仍列於下方 release gate，尚未完成，不以程式驗證冒充部署驗收。
 
 ## Pilot 累計已交付（R0–M4）
 

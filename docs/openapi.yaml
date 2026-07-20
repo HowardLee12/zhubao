@@ -758,6 +758,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/EventListEnvelope"
 
+  /organizations/{orgId}/assets/{assetId}/service-events:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+      - $ref: "#/components/parameters/AssetId"
+    post:
+      tags: [Customers]
+      operationId: appendAssetServiceEvent
+      summary: Append an append-only service event to an asset history
+      security: *employeeWriteSecurity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppendAssetServiceEventRequest"
+      responses:
+        <<: *standardErrors
+        "201":
+          description: Service event appended.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetServiceEventEnvelope"
+
   /organizations/{orgId}/service-requests:
     parameters:
       - $ref: "#/components/parameters/OrgId"
@@ -3347,7 +3371,39 @@ paths:
               schema:
                 $ref: "#/components/schemas/MaintenancePlanEnvelope"
 
-  /organizations/{orgId}/maintenance-reminders:prepare:
+  /organizations/{orgId}/maintenance-plans/{id}/actions/convert:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+      - $ref: "#/components/parameters/ResourceId"
+      - $ref: "#/components/parameters/IfMatch"
+      - $ref: "#/components/parameters/IdempotencyKey"
+    post:
+      tags: [Maintenance]
+      operationId: convertMaintenancePlanToRequest
+      summary: One-click convert a due plan into a revisit service request
+      security: *employeeWriteSecurity
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConvertMaintenancePlanRequest"
+      responses:
+        <<: *standardErrors
+        "200":
+          description: Existing revisit request returned (idempotent replay).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevisitRequestEnvelope"
+        "201":
+          description: Revisit service request created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevisitRequestEnvelope"
+
+  /organizations/{orgId}/maintenance-reminders/actions/prepare:
     parameters:
       - $ref: "#/components/parameters/OrgId"
       - $ref: "#/components/parameters/IdempotencyKey"
@@ -3428,7 +3484,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/NotificationEnvelope"
 
-  /organizations/{orgId}/notifications:approve:
+  /organizations/{orgId}/notifications/actions/approve:
     parameters:
       - $ref: "#/components/parameters/OrgId"
       - $ref: "#/components/parameters/IdempotencyKey"
@@ -3764,6 +3820,52 @@ paths:
               schema:
                 $ref: "#/components/schemas/RetentionReportEnvelope"
 
+  /organizations/{orgId}/data-deletion/actions/request:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    post:
+      tags: [Session]
+      operationId: requestPilotDataDeletion
+      summary: Owner requests org data deletion (re-auth, async export scheduled)
+      security: *employeeWriteSecurity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestDataDeletionRequest"
+      responses:
+        <<: *standardErrors
+        "202":
+          description: Deletion request accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataDeletionRequestEnvelope"
+
+  /organizations/{orgId}/data-deletion/actions/finalize:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    post:
+      tags: [Session]
+      operationId: finalizePilotDataDeletion
+      summary: Owner finalizes org data deletion (re-auth, org-scoped anonymization)
+      security: *employeeWriteSecurity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinalizeDataDeletionRequest"
+      responses:
+        <<: *standardErrors
+        "200":
+          description: Deletion finalized (confirm-once).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataDeletionFinalizedEnvelope"
+
   /internal/workers/notifications:dispatch:
     post:
       tags: [Notifications]
@@ -3792,7 +3894,7 @@ paths:
         "200":
           $ref: "#/components/responses/WorkerBatchResult"
 
-  /internal/workers/maintenance:scan:
+  /internal/workers/maintenance-scan:
     post:
       tags: [Maintenance]
       operationId: scanMaintenanceWorkerBatch
@@ -3806,7 +3908,7 @@ paths:
         "200":
           $ref: "#/components/responses/WorkerBatchResult"
 
-  /internal/workers/payments:mark-overdue:
+  /internal/workers/payment-overdue:
     post:
       tags: [Payments]
       operationId: markOverduePaymentsWorkerBatch
@@ -3839,6 +3941,20 @@ paths:
       tags: [Session]
       operationId: cleanupTokensWorkerBatch
       summary: Remove expired public tokens and idempotency records
+      security:
+        - workerBearer: []
+      requestBody:
+        $ref: "#/components/requestBodies/WorkerBatch"
+      responses:
+        <<: *standardErrors
+        "200":
+          $ref: "#/components/responses/WorkerBatchResult"
+
+  /internal/workers/retention-cleanup:
+    post:
+      tags: [Session]
+      operationId: runRetentionCleanupWorkerBatch
+      summary: Purge expired uploads, strip raw webhook payloads and clean export artifacts
       security:
         - workerBearer: []
       requestBody:
@@ -8736,37 +8852,51 @@ components:
 
     PaymentMilestone:
       type: object
+      description: >-
+        Payment tracking projection from private.payment_milestone_json. amountMinor
+        and currency are present ONLY when the caller has cost visibility
+        (includeAmounts=true in the list envelope); financial-blind roles receive
+        the same object without those two keys.
       additionalProperties: false
       properties:
         id:
           $ref: "#/components/schemas/Uuid"
+        organizationId:
+          $ref: "#/components/schemas/Uuid"
         projectId:
           $ref: "#/components/schemas/Uuid"
-        sequenceNo:
-          type: integer
-          minimum: 1
+        quoteVersionId:
+          type: [string, "null"]
+          format: uuid
+        changeOrderId:
+          type: [string, "null"]
+          format: uuid
         name:
           type: string
           minLength: 1
-          maxLength: 200
-        description:
-          type: [string, "null"]
-          maxLength: 2000
-        amountMinor:
-          $ref: "#/components/schemas/MoneyMinor"
-        currency:
-          $ref: "#/components/schemas/Currency"
+          maxLength: 120
+        sequenceNo:
+          type: integer
+          minimum: 1
+        status:
+          $ref: "#/components/schemas/PaymentStatus"
         dueOn:
           anyOf:
             - $ref: "#/components/schemas/BusinessDate"
             - type: "null"
-        status:
-          $ref: "#/components/schemas/PaymentStatus"
         invoicedAt:
           anyOf:
             - $ref: "#/components/schemas/Timestamp"
             - type: "null"
         paidAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        waivedAt:
+          anyOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        cancelledAt:
           anyOf:
             - $ref: "#/components/schemas/Timestamp"
             - type: "null"
@@ -8776,14 +8906,24 @@ components:
             - type: "null"
         externalReference:
           type: [string, "null"]
-          maxLength: 200
+          maxLength: 120
+        notes:
+          type: string
+          maxLength: 2000
         lockVersion:
           $ref: "#/components/schemas/LockVersion"
         createdAt:
           $ref: "#/components/schemas/Timestamp"
         updatedAt:
           $ref: "#/components/schemas/Timestamp"
-      required: [id, projectId, sequenceNo, name, description, amountMinor, currency, dueOn, status, invoicedAt, paidAt, paymentMethod, externalReference, lockVersion, createdAt, updatedAt]
+        timezone:
+          type: string
+          maxLength: 64
+        amountMinor:
+          $ref: "#/components/schemas/MoneyMinor"
+        currency:
+          $ref: "#/components/schemas/Currency"
+      required: [id, organizationId, projectId, quoteVersionId, changeOrderId, name, sequenceNo, status, dueOn, invoicedAt, paidAt, waivedAt, cancelledAt, paymentMethod, externalReference, notes, lockVersion, createdAt, updatedAt, timezone]
     CreatePaymentMilestoneRequest:
       type: object
       additionalProperties: false
@@ -8853,17 +8993,24 @@ components:
         data:
           $ref: "#/components/schemas/PaymentMilestone"
       required: [data]
+    PaymentMilestoneList:
+      type: object
+      additionalProperties: false
+      properties:
+        milestones:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentMilestone"
+        includeAmounts:
+          type: boolean
+      required: [milestones, includeAmounts]
     PaymentMilestoneListEnvelope:
       type: object
       additionalProperties: false
       properties:
         data:
-          type: array
-          items:
-            $ref: "#/components/schemas/PaymentMilestone"
-        meta:
-          $ref: "#/components/schemas/ListMeta"
-      required: [data, meta]
+          $ref: "#/components/schemas/PaymentMilestoneList"
+      required: [data]
 
     MaintenancePlan:
       type: object
@@ -9348,77 +9495,61 @@ components:
           type: string
           maxLength: 64
       required: [from, to, timezone]
-    RatioMetric:
+    DashboardMetric:
       type: object
-      additionalProperties: false
+      description: >-
+        A single KPI. Every metric carries its own numerator, denominator,
+        window and timezone so the UI can render an honest "尚無足夠資料"
+        (available=false) instead of a misleading 0%. numerator/denominator are
+        nullable; extra numeric fields may be present.
+      additionalProperties: true
       properties:
+        available:
+          type: boolean
         numerator:
-          type: integer
-          minimum: 0
-        denominator:
-          type: integer
-          minimum: 0
-        ratio:
           type: [number, "null"]
-          minimum: 0
-          maximum: 1
+        denominator:
+          type: [number, "null"]
         window:
           $ref: "#/components/schemas/MetricWindow"
-      required: [numerator, denominator, ratio, window]
-    DurationMetric:
+        timezone:
+          type: string
+          maxLength: 64
+      required: [available, numerator, denominator, window, timezone]
+    DashboardFirstResponseMetric:
+      allOf:
+        - $ref: "#/components/schemas/DashboardMetric"
+        - type: object
+          properties:
+            medianSeconds:
+              type: [integer, "null"]
+              minimum: 0
+            p90Seconds:
+              type: [integer, "null"]
+              minimum: 0
+          required: [medianSeconds, p90Seconds]
+    DashboardMetrics:
       type: object
       additionalProperties: false
       properties:
-        medianSeconds:
-          type: [integer, "null"]
-          minimum: 0
-        p90Seconds:
-          type: [integer, "null"]
-          minimum: 0
-        sampleSize:
-          type: integer
-          minimum: 0
-        window:
-          $ref: "#/components/schemas/MetricWindow"
-      required: [medianSeconds, p90Seconds, sampleSize, window]
-    DashboardQueue:
-      type: object
-      additionalProperties: false
-      properties:
-        newServiceRequests:
-          type: integer
-          minimum: 0
-        quotesAwaitingApproval:
-          type: integer
-          minimum: 0
-        unassignedWorkOrders:
-          type: integer
-          minimum: 0
-        overduePayments:
-          type: integer
-          minimum: 0
-        maintenanceDue:
-          type: integer
-          minimum: 0
-        notificationsFailed:
-          type: integer
-          minimum: 0
-      required: [newServiceRequests, quotesAwaitingApproval, unassignedWorkOrders, overduePayments, maintenanceDue, notificationsFailed]
+        firstResponseTime:
+          $ref: "#/components/schemas/DashboardFirstResponseMetric"
+        quoteAcceptanceRate:
+          $ref: "#/components/schemas/DashboardMetric"
+        completionRate:
+          $ref: "#/components/schemas/DashboardMetric"
+        revisitRate:
+          $ref: "#/components/schemas/DashboardMetric"
+      required: [firstResponseTime, quoteAcceptanceRate, completionRate, revisitRate]
     Dashboard:
       type: object
       additionalProperties: false
       properties:
-        responseSpeed:
-          $ref: "#/components/schemas/DurationMetric"
-        quoteAcceptanceRate:
-          $ref: "#/components/schemas/RatioMetric"
-        completionRate:
-          $ref: "#/components/schemas/RatioMetric"
-        retentionRate:
-          $ref: "#/components/schemas/RatioMetric"
-        queues:
-          $ref: "#/components/schemas/DashboardQueue"
-      required: [responseSpeed, quoteAcceptanceRate, completionRate, retentionRate, queues]
+        window:
+          $ref: "#/components/schemas/MetricWindow"
+        metrics:
+          $ref: "#/components/schemas/DashboardMetrics"
+      required: [window, metrics]
     DashboardEnvelope:
       type: object
       additionalProperties: false
@@ -9426,21 +9557,26 @@ components:
         data:
           $ref: "#/components/schemas/Dashboard"
       required: [data]
-    FunnelStage:
+    FunnelStages:
       type: object
       additionalProperties: false
       properties:
-        stage:
-          type: string
-          enum: [request, quote_sent, quote_accepted, work_completed]
-        count:
+        intake:
           type: integer
           minimum: 0
-        conversionFromPrevious:
-          type: [number, "null"]
+        triaged:
+          type: integer
           minimum: 0
-          maximum: 1
-      required: [stage, count, conversionFromPrevious]
+        quoted:
+          type: integer
+          minimum: 0
+        converted:
+          type: integer
+          minimum: 0
+        completed:
+          type: integer
+          minimum: 0
+      required: [intake, triaged, quoted, converted, completed]
     FunnelReport:
       type: object
       additionalProperties: false
@@ -9448,11 +9584,7 @@ components:
         window:
           $ref: "#/components/schemas/MetricWindow"
         stages:
-          type: array
-          minItems: 4
-          maxItems: 4
-          items:
-            $ref: "#/components/schemas/FunnelStage"
+          $ref: "#/components/schemas/FunnelStages"
       required: [window, stages]
     FunnelReportEnvelope:
       type: object
@@ -9461,33 +9593,59 @@ components:
         data:
           $ref: "#/components/schemas/FunnelReport"
       required: [data]
-    TechnicianLoadBucket:
+    OperationsWorkOrderCounts:
       type: object
       additionalProperties: false
       properties:
-        date:
-          $ref: "#/components/schemas/BusinessDate"
-        assignedHours:
-          type: number
-          minimum: 0
-        activeTechnicians:
+        scheduled:
           type: integer
           minimum: 0
-      required: [date, assignedHours, activeTechnicians]
+        inProgress:
+          type: integer
+          minimum: 0
+        completed:
+          type: integer
+          minimum: 0
+        cancelled:
+          type: integer
+          minimum: 0
+      required: [scheduled, inProgress, completed, cancelled]
+    OperationsPaymentCounts:
+      type: object
+      description: >-
+        Current-state payment counts. outstandingAmountMinor is present only when
+        includeAmounts is true — the RPC redacts amounts for roles without cost
+        visibility.
+      additionalProperties: true
+      properties:
+        pending:
+          type: integer
+          minimum: 0
+        invoiced:
+          type: integer
+          minimum: 0
+        overdue:
+          type: integer
+          minimum: 0
+        paid:
+          type: integer
+          minimum: 0
+        outstandingAmountMinor:
+          $ref: "#/components/schemas/MoneyMinor"
+      required: [pending, invoiced, overdue, paid]
     OperationsReport:
       type: object
       additionalProperties: false
       properties:
-        responseSpeed:
-          $ref: "#/components/schemas/DurationMetric"
-        completionRate:
-          $ref: "#/components/schemas/RatioMetric"
-        aggregateTechnicianLoad:
-          type: array
-          maxItems: 366
-          items:
-            $ref: "#/components/schemas/TechnicianLoadBucket"
-      required: [responseSpeed, completionRate, aggregateTechnicianLoad]
+        window:
+          $ref: "#/components/schemas/MetricWindow"
+        workOrders:
+          $ref: "#/components/schemas/OperationsWorkOrderCounts"
+        payments:
+          $ref: "#/components/schemas/OperationsPaymentCounts"
+        includeAmounts:
+          type: boolean
+      required: [window, workOrders, payments, includeAmounts]
     OperationsReportEnvelope:
       type: object
       additionalProperties: false
@@ -9501,15 +9659,16 @@ components:
       properties:
         window:
           $ref: "#/components/schemas/MetricWindow"
-        maintenanceDue:
+        activePlans:
           type: integer
           minimum: 0
         remindersSent:
           type: integer
           minimum: 0
-        reminderBookingConversion:
-          $ref: "#/components/schemas/RatioMetric"
-      required: [window, maintenanceDue, remindersSent, reminderBookingConversion]
+        revisitRequests:
+          type: integer
+          minimum: 0
+      required: [window, activePlans, remindersSent, revisitRequests]
     RetentionReportEnvelope:
       type: object
       additionalProperties: false
@@ -9875,4 +10034,162 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/WorkerResult"
+      required: [data]
+
+    AppendAssetServiceEventRequest:
+      type: object
+      additionalProperties: false
+      description: Append-only asset service note. Never carries cost.
+      properties:
+        eventType:
+          type: string
+          enum: [serviced, inspected, repaired, installed, note]
+        summary:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        workOrderId:
+          type: [string, "null"]
+          format: uuid
+        servicedAt:
+          type: [string, "null"]
+          format: date-time
+        occurredAt:
+          type: string
+          format: date-time
+      required: [eventType, summary]
+    AssetServiceEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        assetId:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+      required: [assetId, eventId]
+    AssetServiceEventEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/AssetServiceEvent"
+      required: [data]
+
+    ConvertMaintenancePlanRequest:
+      type: object
+      additionalProperties: false
+      description: |
+        One-click revisit conversion. force=true is required to proceed when the
+        asset already has an open request (the API otherwise returns 409).
+      properties:
+        subject:
+          type: [string, "null"]
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 4000
+        force:
+          type: boolean
+        occurredAt:
+          type: string
+          format: date-time
+    RevisitRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        serviceRequestId:
+          type: string
+          format: uuid
+        requestNo:
+          type: [string, "null"]
+        replayed:
+          type: boolean
+      required: [serviceRequestId, replayed]
+    RevisitRequestEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/RevisitRequest"
+      required: [data]
+
+    RequestDataDeletionRequest:
+      type: object
+      additionalProperties: false
+      description: |
+        Owner re-authentication material. The route hashes it before it reaches the
+        database; the raw token is never stored or logged.
+      properties:
+        reauthToken:
+          type: string
+          minLength: 8
+          maxLength: 4096
+        occurredAt:
+          type: string
+          format: date-time
+      required: [reauthToken]
+    DataDeletionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        deletionRequestId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [requested]
+      required: [deletionRequestId, status]
+    DataDeletionRequestEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/DataDeletionRequest"
+      required: [data]
+    FinalizeDataDeletionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        deletionRequestId:
+          type: string
+          format: uuid
+        reauthToken:
+          type: string
+          minLength: 8
+          maxLength: 4096
+        occurredAt:
+          type: string
+          format: date-time
+      required: [deletionRequestId, reauthToken]
+    DataDeletionFinalized:
+      type: object
+      additionalProperties: false
+      properties:
+        deletionRequestId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [finalized]
+        anonymizedCustomers:
+          type: integer
+          minimum: 0
+        anonymizedLocations:
+          type: integer
+          minimum: 0
+        anonymizedRequests:
+          type: integer
+          minimum: 0
+        replayed:
+          type: boolean
+      required: [deletionRequestId, status, replayed]
+    DataDeletionFinalizedEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/DataDeletionFinalized"
       required: [data]

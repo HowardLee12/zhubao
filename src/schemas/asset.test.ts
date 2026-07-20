@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { assetRowSchema, toAssetDto } from "./asset";
+import {
+  appendAssetServiceEventSchema,
+  assetRowSchema,
+  patchAssetSchema,
+  retireAssetSchema,
+  toAssetDto,
+} from "./asset";
 
 describe("asset read DTO", () => {
   const dbRow = {
@@ -42,5 +48,30 @@ describe("asset read DTO", () => {
 
   it("rejects an unknown asset type", () => {
     expect(() => assetRowSchema.parse({ ...dbRow, asset_type: "spaceship" })).toThrow();
+  });
+});
+
+describe("asset mutation schemas", () => {
+  it("patch accepts partial nullable fields and rejects unknown keys", () => {
+    expect(patchAssetSchema.safeParse({ brand: "Daikin" }).success).toBe(true);
+    expect(patchAssetSchema.safeParse({ serialNumber: null }).success).toBe(true);
+    expect(patchAssetSchema.safeParse({ cost: 100 }).success).toBe(false);
+  });
+
+  it("retire accepts an optional reason", () => {
+    expect(retireAssetSchema.safeParse({}).success).toBe(true);
+    expect(retireAssetSchema.safeParse({ reason: "汰換" }).success).toBe(true);
+  });
+
+  it("service event validates the event type and requires a summary", () => {
+    expect(
+      appendAssetServiceEventSchema.safeParse({ eventType: "serviced", summary: "清洗" }).success,
+    ).toBe(true);
+    expect(
+      appendAssetServiceEventSchema.safeParse({ eventType: "exploded", summary: "x" }).success,
+    ).toBe(false);
+    expect(
+      appendAssetServiceEventSchema.safeParse({ eventType: "note", summary: "" }).success,
+    ).toBe(false);
   });
 });

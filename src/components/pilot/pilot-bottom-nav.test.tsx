@@ -23,12 +23,12 @@ function tabLabels(): string[] {
 describe("PilotBottomNav", () => {
   it("renders the manager tab set for an owner", () => {
     render(<PilotBottomNav role="owner" />);
-    expect(tabLabels()).toEqual(["工作台", "接案匣", "排程", "成員", "設定"]);
+    expect(tabLabels()).toEqual(["工作台", "接案匣", "排程", "收款", "回訪", "設定"]);
   });
 
   it("renders the manager tab set for a dispatcher", () => {
     render(<PilotBottomNav role="dispatcher" />);
-    expect(tabLabels()).toEqual(["工作台", "接案匣", "排程", "成員", "設定"]);
+    expect(tabLabels()).toEqual(["工作台", "接案匣", "排程", "收款", "回訪", "設定"]);
   });
 
   it("renders the technician tab set", () => {
@@ -46,7 +46,8 @@ describe("PilotBottomNav", () => {
       "/app",
       "/app/inbox",
       "/app/schedule",
-      "/app/settings/team",
+      "/app/payments",
+      "/app/follow-ups",
       "/app/settings",
     ]);
   });
@@ -72,6 +73,20 @@ describe("PilotBottomNav", () => {
     render(<PilotBottomNav role="owner" />);
     const current = screen.getByRole("link", { current: "page" });
     expect(current).toHaveTextContent("接案匣");
+  });
+
+  it("activates 收款 on a nested payments route", () => {
+    pathname.value = "/app/payments";
+    render(<PilotBottomNav role="dispatcher" />);
+    const current = screen.getByRole("link", { current: "page" });
+    expect(current).toHaveTextContent("收款");
+  });
+
+  it("activates 回訪 on the follow-ups surface", () => {
+    pathname.value = "/app/follow-ups";
+    render(<PilotBottomNav role="owner" />);
+    const current = screen.getByRole("link", { current: "page" });
+    expect(current).toHaveTextContent("回訪");
   });
 
   it("keeps 工作台 exact so it is not active on nested manager routes", () => {

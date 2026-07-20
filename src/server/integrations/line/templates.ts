@@ -14,6 +14,7 @@ export const TEMPLATE_KEYS = [
   "en_route",
   "completed",
   "payment_reminder",
+  "maintenance_reminder",
 ] as const;
 
 export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
@@ -28,6 +29,8 @@ export interface TemplateVars {
   scheduledAt?: string;
   workOrderNumber?: string;
   technicianName?: string;
+  planName?: string;
+  nextDueOn?: string;
 }
 
 const LINE_TEXT_MAX = 5000;
@@ -78,6 +81,14 @@ const RENDERERS: Record<TemplateKey, (vars: TemplateVars) => LineMessage[]> = {
     text(
       `${value(vars.customerName, "您好")}，提醒您工單 ${value(vars.workOrderNumber, "")} 的款項 ` +
         `${value(vars.amountLabel, "")} 尚待付款，感謝您。`,
+    ),
+  ],
+  // Consent-gated, human-approved revisit reminder. Enqueued approval_status
+  // 'pending'; only sent after staff approval (no auto-repair).
+  maintenance_reminder: (vars) => [
+    text(
+      `${value(vars.customerName, "您好")}，您的「${value(vars.planName, "定期保養")}」` +
+        `預計於 ${value(vars.nextDueOn, "近期")} 到期，若需安排回訪服務請與我們聯繫，感謝您。`,
     ),
   ],
 };

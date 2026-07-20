@@ -657,7 +657,7 @@ Public DTO 範例：
 
 | Method | Path | 角色 | 規格摘要 |
 |---|---|---|---|
-| GET/POST | `/organizations/{orgId}/payment-milestones` | O/A/D/C/V；POST O/A/D/C | filter `projectId,status,dueFrom,dueTo` |
+| GET/POST | `/organizations/{orgId}/payment-milestones` | O/A/D/C/V；POST O/A/D/C | GET filter `projectId,status,limit`，回 `{ data:{ milestones, includeAmounts } }`（金額欄位僅在有成本可見權限時回） |
 | GET/PATCH | `.../payment-milestones/{id}` | GET O/A/D/C/V；PATCH O/A/C | PATCH pending/invoiced fields；If-Match |
 | POST | `.../{id}/actions/invoice` | O/A/D/C | If-Match + Idempotency |
 | POST | `.../{id}/actions/mark-paid` | O/A/C | paymentMethod, paidAt, externalReference；If-Match + Idempotency |
@@ -677,9 +677,9 @@ Public DTO 範例：
 | POST | `.../{id}/actions/resume` | O/A/D | nextDueOn；If-Match |
 | POST | `.../{id}/actions/complete` | O/A/D | last work order、next due；If-Match + Idempotency |
 | POST | `.../{id}/actions/cancel` | O/A/D | reason；If-Match |
-| POST | `/organizations/{orgId}/maintenance-reminders:prepare` | O/A/D | 只建 notification drafts，最多 100；Idempotency |
+| POST | `/organizations/{orgId}/maintenance-reminders/actions/prepare` | O/A/D | 只建 notification drafts，最多 100；Idempotency |
 
-Cron 可準備草稿，但正式發送需 owner/admin/dispatcher 批次核准：`POST /notifications:approve`。
+Cron 可準備草稿，但正式發送需 owner/admin/dispatcher 批次核准：`POST /notifications/actions/approve`。
 
 ## 15. Notifications
 
@@ -687,7 +687,7 @@ Cron 可準備草稿，但正式發送需 owner/admin/dispatcher 批次核准：
 |---|---|---|---|
 | GET | `/organizations/{orgId}/notifications` | O/A/D | filter `status,channel,relatedType,relatedId,scheduledFrom` |
 | GET | `.../notifications/{id}` | O/A/D | redacted provider info + attempts |
-| POST | `.../notifications:approve` | O/A/D | 最多 100 個 pending draft ids；Idempotency |
+| POST | `.../notifications/actions/approve` | O/A/D | 最多 100 個 pending draft ids；Idempotency |
 | POST | `.../notifications/{id}/actions/retry` | O/A/D | failed only；Idempotency；server transaction 鎖 row |
 | POST | `.../notifications/{id}/actions/cancel` | O/A/D | pending/failed only |
 
@@ -743,19 +743,19 @@ Response：
 
 | Method | Path | 角色 | 說明 |
 |---|---|---|---|
-| GET | `/organizations/{orgId}/dashboard` | O/A/D/C/V | query `from,to` 最大 366 日；四 KPI + 待處理摘要 |
-| GET | `/organizations/{orgId}/reports/funnel` | O/A/D/C/V | request→quote→accept→complete funnel |
-| GET | `/organizations/{orgId}/reports/operations` | O/A/D/V | response time、completion、technician load；不做員工敏感排名預設展示 |
-| GET | `/organizations/{orgId}/reports/retention` | O/A/D/V | maintenance due、reminder→booking conversion |
+| GET | `/organizations/{orgId}/dashboard` | O/A/D/C/V | query `from,to` 最大 366 日；回 `{ window, metrics }`，四固定 KPI 各帶 available/numerator/denominator/window/timezone |
+| GET | `/organizations/{orgId}/reports/funnel` | O/A/D/C/V | 回 `{ window, stages:{intake,triaged,quoted,converted,completed} }` |
+| GET | `/organizations/{orgId}/reports/operations` | O/A/D/V | 回 `{ window, workOrders:{scheduled,inProgress,completed,cancelled}, payments:{pending,invoiced,overdue,paid,outstandingAmountMinor?}, includeAmounts }`；金額欄位僅在有成本可見權限時回 |
+| GET | `/organizations/{orgId}/reports/retention` | O/A/D/V | 回 `{ window, activePlans, remindersSent, revisitRequests }` |
 
-KPI 定義必須固定：
+`GET /dashboard` 回 `{ window, metrics }`，`metrics` 為四個固定 KPI，key 必須固定：
 
-- 回覆速度：`service_request.created_at → first triaged/commented event` median/p90。
-- 報價接受率：期間內 first sent quote 中 accepted / resolved sent；排除 cancelled。
-- 完工率：scheduled work orders 中 completed / (completed + cancelled + overdue open)，需回 denominator。
-- 回訪率：maintenance reminder 發送後 30 日內產生關聯 service request/work order 的 unique customer 比率。
+- `firstResponseTime`：`service_request.created_at → first triaged/commented event` median/p90（額外回 `medianSeconds`、`p90Seconds`）。
+- `quoteAcceptanceRate`：期間內 first sent quote 中 accepted / resolved sent；排除 cancelled。
+- `completionRate`：scheduled work orders 中 completed / (completed + cancelled + overdue open)，需回 denominator。
+- `revisitRate`：maintenance reminder 發送後 30 日內產生關聯 service request/work order 的 unique customer 比率。
 
-Response 同時回 numerator、denominator、window 與 timezone，不只回百分比。
+每個 metric 都回 `available`、`numerator`、`denominator`、`window` 與 `timezone`，讓 UI 在資料不足時顯示「尚無足夠資料」而非誤導性的 0%，不只回百分比。
 
 ## 18. Internal worker API
 
@@ -763,8 +763,8 @@ Response 同時回 numerator、denominator、window 與 timezone，不只回百�
 |---|---|---|---|
 | POST | `/internal/workers/notifications:dispatch` | W | claim + 發送一批，body `{limit:1..50}` |
 | POST | `/internal/workers/line-webhooks:process` | W | claim + 處理 inbox |
-| POST | `/internal/workers/maintenance:scan` | W | org-timezone due scan，建立待核准 drafts |
-| POST | `/internal/workers/payments:mark-overdue` | W | idempotent 狀態更新 |
+| POST | `/internal/workers/maintenance-scan` | W | org-timezone due scan，建立待核准 drafts |
+| POST | `/internal/workers/payment-overdue` | W | idempotent 狀態更新 |
 | POST | `/internal/workers/media:cleanup` | W | pending/deleted cleanup |
 | POST | `/internal/workers/tokens:cleanup` | W | expired token/key cleanup |
 | POST | `/internal/workers/intake-extraction` | W | claim 無草稿的開啟中 LINE 對話並抽取進件草稿，body 選填 `{limit:1..50}` |

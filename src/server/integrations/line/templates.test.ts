@@ -7,7 +7,7 @@ import {
 } from "./templates";
 
 describe("template registry", () => {
-  it("exposes exactly the M6 allowlisted keys", () => {
+  it("exposes exactly the allowlisted keys (M6 + the M8 maintenance reminder)", () => {
     expect([...TEMPLATE_KEYS]).toEqual([
       "received",
       "quote_sent",
@@ -15,6 +15,7 @@ describe("template registry", () => {
       "en_route",
       "completed",
       "payment_reminder",
+      "maintenance_reminder",
     ]);
   });
 

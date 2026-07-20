@@ -1,48 +1,77 @@
 -- Renoly v2 deterministic local/test seed. All identities and business data below
 -- are synthetic. Fixed user UUIDs support pgTAP JWT-claim tests.
 --
--- Password sign-in identities are intentionally not inserted because auth.identities
--- columns vary with GoTrue releases. E2E environments should provision these fixed
--- user IDs through the Supabase Admin API. SQL/RLS tests set request.jwt.claim.sub.
+-- Auth users below are login-ready: GoTrue requires instance_id set and the token
+-- columns to be '' (not NULL) or it treats the row as malformed and re-inserts,
+-- tripping users_email_partial_key on OTP/magic-link. Each user also gets an email
+-- identity so passwordless sign-in resolves the existing user instead of creating one.
+-- SQL/RLS tests still set request.jwt.claim.sub directly.
 
 begin;
 
 insert into auth.users (
-  id, aud, role, email, encrypted_password, email_confirmed_at,
-  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+  id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, email_change, email_change_token_new, email_change_token_current,
+  recovery_token, phone_change, phone_change_token, reauthentication_token
 )
 values
   (
-    '10000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated',
+    '10000000-0000-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000',
+    'authenticated', 'authenticated',
     'alpha.owner@example.test', extensions.crypt('RenolyDemo-Owner-2026', extensions.gen_salt('bf')),
     '2026-01-01 00:00:00+00', '{"provider":"email","providers":["email"]}',
-    '{"display_name":"Alpha Owner"}', '2026-01-01 00:00:00+00', '2026-01-01 00:00:00+00'
+    '{"display_name":"Alpha Owner"}', '2026-01-01 00:00:00+00', '2026-01-01 00:00:00+00',
+    '', '', '', '', '', '', '', ''
   ),
   (
-    '10000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated',
+    '10000000-0000-4000-8000-000000000002', '00000000-0000-0000-0000-000000000000',
+    'authenticated', 'authenticated',
     'alpha.dispatcher@example.test', extensions.crypt('RenolyDemo-Dispatcher-2026', extensions.gen_salt('bf')),
     '2026-01-01 00:00:00+00', '{"provider":"email","providers":["email"]}',
-    '{"display_name":"Alpha Dispatcher"}', '2026-01-01 00:00:00+00', '2026-01-01 00:00:00+00'
+    '{"display_name":"Alpha Dispatcher"}', '2026-01-01 00:00:00+00', '2026-01-01 00:00:00+00',
+    '', '', '', '', '', '', '', ''
   ),
   (
-    '10000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated',
+    '10000000-0000-4000-8000-000000000003', '00000000-0000-0000-0000-000000000000',
+    'authenticated', 'authenticated',
     'alpha.tech-a@example.test', extensions.crypt('RenolyDemo-TechA-2026', extensions.gen_salt('bf')),
     '2026-01-01 00:00:00+00', '{"provider":"email","providers":["email"]}',
-    '{"display_name":"Alpha Tech A"}', '2026-01-01 00:00:00+00', '2026-01-01 00:00:00+00'
+    '{"display_name":"Alpha Tech A"}', '2026-01-01 00:00:00+00', '2026-01-01 00:00:00+00',
+    '', '', '', '', '', '', '', ''
   ),
   (
-    '10000000-0000-4000-8000-000000000004', 'authenticated', 'authenticated',
+    '10000000-0000-4000-8000-000000000004', '00000000-0000-0000-0000-000000000000',
+    'authenticated', 'authenticated',
     'alpha.tech-b@example.test', extensions.crypt('RenolyDemo-TechB-2026', extensions.gen_salt('bf')),
     '2026-01-01 00:00:00+00', '{"provider":"email","providers":["email"]}',
-    '{"display_name":"Alpha Tech B"}', '2026-01-01 00:00:00+00', '2026-01-01 00:00:00+00'
+    '{"display_name":"Alpha Tech B"}', '2026-01-01 00:00:00+00', '2026-01-01 00:00:00+00',
+    '', '', '', '', '', '', '', ''
   ),
   (
-    '10000000-0000-4000-8000-000000000005', 'authenticated', 'authenticated',
+    '10000000-0000-4000-8000-000000000005', '00000000-0000-0000-0000-000000000000',
+    'authenticated', 'authenticated',
     'beta.owner@example.test', extensions.crypt('RenolyDemo-BetaOwner-2026', extensions.gen_salt('bf')),
     '2026-01-01 00:00:00+00', '{"provider":"email","providers":["email"]}',
-    '{"display_name":"Beta Owner"}', '2026-01-01 00:00:00+00', '2026-01-01 00:00:00+00'
+    '{"display_name":"Beta Owner"}', '2026-01-01 00:00:00+00', '2026-01-01 00:00:00+00',
+    '', '', '', '', '', '', '', ''
   )
 on conflict (id) do nothing;
+
+-- Email identity per user so GoTrue passwordless sign-in resolves the existing
+-- user (provider_id = user id; identity_data carries the verified email).
+insert into auth.identities (
+  id, user_id, provider_id, identity_data, provider,
+  last_sign_in_at, created_at, updated_at
+)
+select
+  u.id, u.id, u.id::text,
+  jsonb_build_object('sub', u.id::text, 'email', u.email,
+    'email_verified', true, 'phone_verified', false),
+  'email', '2026-01-01 00:00:00+00', '2026-01-01 00:00:00+00', '2026-01-01 00:00:00+00'
+from auth.users u
+where u.email like '%@example.test'
+on conflict (provider_id, provider) do nothing;
 
 insert into public.organizations (
   id, slug, name, industry_template, timezone, currency, status,

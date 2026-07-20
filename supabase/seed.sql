@@ -240,9 +240,11 @@ values
     '10000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001'
   );
 
+-- contact_phone is E.164 like real intake (the public form normalizes it); a null
+-- phone would fail the strict inbox projection schema and blank the whole匣.
 insert into public.service_requests (
   id, organization_id, request_no, customer_id, location_id, asset_id, source,
-  contact_name, contact_email, subject, description, status,
+  contact_name, contact_phone, contact_email, subject, description, status,
   original_submission, created_at, updated_at, created_by, updated_by
 )
 values
@@ -250,8 +252,8 @@ values
     '80000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001',
     'R-2026-0001', '40000000-0000-4000-8000-000000000001',
     '50000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000001',
-    'manual', '示範客戶甲', 'customer.alpha@example.test', '冷氣需要清洗', '固定 new 進件測試資料', 'new',
-    '{"contactName":"示範客戶甲","contactEmail":"customer.alpha@example.test","subject":"冷氣需要清洗","description":"固定 new 進件測試資料","source":"manual","submittedAt":"2026-01-04T00:00:00Z","intakeVersion":1,"seeded":true}'::jsonb,
+    'manual', '示範客戶甲', '+886912345001', 'customer.alpha@example.test', '冷氣需要清洗', '固定 new 進件測試資料', 'new',
+    '{"contactName":"示範客戶甲","contactPhone":"+886912345001","contactEmail":"customer.alpha@example.test","subject":"冷氣需要清洗","description":"固定 new 進件測試資料","source":"manual","submittedAt":"2026-01-04T00:00:00Z","intakeVersion":1,"seeded":true}'::jsonb,
     '2026-01-04 00:00:00+00', '2026-01-04 00:00:00+00',
     '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002'
   ),
@@ -259,7 +261,7 @@ values
     '80000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001',
     'R-2026-0002', '40000000-0000-4000-8000-000000000001',
     '50000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000001',
-    'manual', '示範客戶甲', 'customer.alpha@example.test', '已排程清洗', '工單與技師權限測試資料', 'triaged',
+    'manual', '示範客戶甲', '+886912345002', 'customer.alpha@example.test', '已排程清洗', '工單與技師權限測試資料', 'triaged',
     null,
     '2026-01-05 00:00:00+00', '2026-01-05 00:00:00+00',
     '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002'

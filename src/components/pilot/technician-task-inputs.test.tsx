@@ -48,6 +48,40 @@ describe("ChecklistItemInput", () => {
     expect(onRespond).toHaveBeenCalledWith(42);
   });
 
+  it("shows an evidence-photo capture for a boolean item that also requires evidence", async () => {
+    // The completion gate needs BOTH the 是/否 answer AND a supporting photo; without
+    // the evidence tile a required boolean item would be unsatisfiable (the deadlock
+    // a technician hit in the field).
+    const onRespond = vi.fn();
+    const onCapture = vi.fn();
+    render(
+      <ChecklistItemInput
+        item={item({ responseType: "boolean", evidenceRequired: true })}
+        disabled={false}
+        onRespond={onRespond}
+        onCapture={onCapture}
+      />,
+    );
+    // Answer input is present…
+    expect(screen.getByRole("button", { name: "是" })).toBeInTheDocument();
+    // …and so is the evidence capture, which uploads via onCapture.
+    const file = new File([new Uint8Array([1])], "e.jpg", { type: "image/jpeg" });
+    await userEvent.upload(screen.getByLabelText(/佐證/), file);
+    expect(onCapture).toHaveBeenCalledWith(file);
+  });
+
+  it("does not show an evidence capture for a boolean item without evidenceRequired", () => {
+    render(
+      <ChecklistItemInput
+        item={item({ responseType: "boolean", evidenceRequired: false })}
+        disabled={false}
+        onRespond={vi.fn()}
+        onCapture={vi.fn()}
+      />,
+    );
+    expect(screen.queryByLabelText(/佐證/)).toBeNull();
+  });
+
   it("captures a file for a photo response type", async () => {
     const onCapture = vi.fn();
     render(

@@ -20,7 +20,67 @@ function toOptions(options: unknown): string[] {
   return options.filter((option): option is string => typeof option === "string");
 }
 
+// A camera-capture tile. Used both for photo-type items and as the evidence
+// attachment for any item whose evidenceRequired flag is set.
+function EvidenceCapture({
+  label,
+  disabled,
+  onCapture,
+}: Readonly<{
+  label: string;
+  disabled: boolean;
+  onCapture: (file: File) => void;
+}>) {
+  return (
+    <div className="mt-2">
+      <label className="block">
+        <span className="sr-only">上傳「{label}」照片</span>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          capture="environment"
+          disabled={disabled}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) onCapture(file);
+            event.target.value = "";
+          }}
+          className="block w-full rounded-xl border border-dashed border-warm-border-strong bg-bg-warm px-3 py-3 text-sm text-ink-2 file:mr-3 file:rounded-lg file:border-0 file:bg-orange-soft file:px-3 file:py-2 file:text-xs file:font-bold file:text-orange-deep"
+        />
+      </label>
+    </div>
+  );
+}
+
 export function ChecklistItemInput({
+  item,
+  disabled,
+  onRespond,
+  onCapture,
+}: Readonly<{
+  item: ChecklistItem;
+  disabled: boolean;
+  onRespond: (value: unknown) => void;
+  onCapture: (file: File) => void;
+}>) {
+  return (
+    <>
+      <ResponseInput item={item} disabled={disabled} onRespond={onRespond} onCapture={onCapture} />
+      {/* An item can require BOTH a response and a supporting photo (evidenceRequired).
+          Photo-type items already capture inline; every other type needs an explicit
+          evidence tile or completion is unsatisfiable (no way to attach the photo). */}
+      {item.evidenceRequired && item.responseType !== "photo" ? (
+        <EvidenceCapture
+          label={`${item.label}佐證`}
+          disabled={disabled}
+          onCapture={onCapture}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function ResponseInput({
   item,
   disabled,
   onRespond,
@@ -59,25 +119,7 @@ export function ChecklistItemInput({
   }
 
   if (item.responseType === "photo") {
-    return (
-      <div className="mt-2">
-        <label className="block">
-          <span className="sr-only">上傳「{item.label}」照片</span>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            capture="environment"
-            disabled={disabled}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) onCapture(file);
-              event.target.value = "";
-            }}
-            className="block w-full rounded-xl border border-dashed border-warm-border-strong bg-bg-warm px-3 py-3 text-sm text-ink-2 file:mr-3 file:rounded-lg file:border-0 file:bg-orange-soft file:px-3 file:py-2 file:text-xs file:font-bold file:text-orange-deep"
-          />
-        </label>
-      </div>
-    );
+    return <EvidenceCapture label={item.label} disabled={disabled} onCapture={onCapture} />;
   }
 
   if (item.responseType === "single_choice" || item.responseType === "multi_choice") {

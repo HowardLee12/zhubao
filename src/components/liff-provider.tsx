@@ -105,7 +105,13 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    initialize();
+    // Run after the effect body so initialization state changes are not a
+    // synchronous effect-side state cascade under React 19's lint rules.
+    const timer = globalThis.setTimeout(() => {
+      void initialize();
+    }, 0);
+
+    return () => globalThis.clearTimeout(timer);
   }, [initialize]);
 
   return (

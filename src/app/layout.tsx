@@ -1,15 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
 export const metadata: Metadata = {
-  title: "Renoly — 裝修小隊的接案管家",
-  description: "報價、排程、收款、工地照片一站搞定。雙版本報價自動算利潤，LINE 一鍵分享給屋主。",
-  metadataBase: new URL("https://zhubao.vercel.app"),
+  title: "Renoly — 小型工程團隊的接案到完工工作台",
+  description: "把 LINE 詢問整理成報價、派工、現場證據、收款與回訪，適合冷氣、水電、抓漏與小型工程團隊。",
+  metadataBase: new URL(siteUrl),
   openGraph: {
-    title: "Renoly — 裝修小隊的接案管家",
-    description: "報價單、工班排程、收款追蹤、施工照片一站搞定。免費試用！",
-    url: "https://zhubao.vercel.app",
+    title: "Renoly — 小型工程團隊的接案到完工工作台",
+    description: "LINE 進件、人工報價、派工、現場證據、收款與回訪，在同一條可追蹤流程完成。",
+    url: siteUrl,
     siteName: "Renoly",
     locale: "zh_TW",
     type: "website",
@@ -19,8 +20,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 };
 
 export default function RootLayout({
@@ -30,18 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-TW">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="antialiased bg-background text-foreground">
-        {children}
-        <Analytics />
-      </body>
+      <body className="antialiased bg-background text-foreground">{children}</body>
     </html>
   );
 }

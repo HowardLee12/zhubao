@@ -7,8 +7,6 @@ import { mondayOf, weekDays, dateInRange } from "@/lib/week";
 import { Pill } from "@/components/ui/pill";
 import type { TradeRow, PaymentRow, PhotoRow } from "@/lib/database.types";
 
-const WEEKDAY_ZH = ["日", "一", "二", "三", "四", "五", "六"];
-
 export function ProjectOverviewTab({
   projectId,
   trades,
